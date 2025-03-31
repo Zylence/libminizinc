@@ -912,174 +912,7 @@ void Flattener::flatten(const std::string& modelString, const std::string& model
           }
 
           ss.add("flatTime", flatten_time.s());
-        }
-
-        if (_flags.featureVector != nullptr) {
-          StatisticsStream ss(_os, _flags.encapsulateJSON, "feature_vector",
-                              "%%%mzn-fvec: ", "%%%mzn-fvec-end");
-          FlatModelFeatureVector features = extract_feature_vector(*env, *_flags.featureVector);
-
-           if (!_flags.encapsulateJSON) {
-            _os << "% Generated FlatZinc Feature Vector:\n";
-          }
-
-          ss.add("flatBoolVars", features.n_bool_vars);
-          ss.add("flatIntVars", features.n_int_vars);
-          ss.add("flatSetVars", features.n_set_vars);
-          
-          ss.addMap("idToVarNameMap", features.customIdToVarNameMap);
-          ss.addMap("idToConstraintNameMap", features.customIdToConstraintNameMap);
-
-          ss.addArray("domainWidths", features.domain_widths);
-          ss.add("stdDeviationDomain", features.std_dev_domain_size);
-          ss.add("averageDomainSize", features.avg_domain_size);
-          ss.add("medianDomainSize", features.median_domain_size);
-          ss.add("averageDomainOverlap", features.avg_domain_overlap);
-          ss.add("numberOfDisjointPairs", features.n_disjoint_domain_pairs);
-          ss.add("metaConstraints", features.n_meta_ct);
-          ss.add("totalConstraints", features.n_total_ct);
-          ss.add("avgDecisionVarsInConstraints", features.avg_decision_vars_in_cts);
-
-          ss.add("constraintGraph", features.constraint_graph);
-          ss.addMap("constraintHistogram", features.ct_histogram);
-          ss.addMap("annotationHistogram", features.ann_histogram);
-
-          SolveI* solveItem = env->flat()->solveItem();
-          if (solveItem->st() != SolveI::SolveType::ST_SAT) {
-            if (solveItem->st() == SolveI::SolveType::ST_MAX) {
-              ss.add("method", "maximize");
-            } else {
-              ss.add("method", "minimize");
-            }
-          } else {
-            ss.add("method", "satisfy");
-          }
-        }
-
-        if (_flags.outputPathsStdout) {
-          if (_flags.verbose) {
-            _log << "Printing Paths to stdout ..." << std::endl;
-          }
-          PathFilePrinter pfp(_os, env->envi());
-          if (_flags.encapsulateJSON) {
-            _os << "{\"type\": \"paths\", \"paths\": ";
-            pfp.json(env->flat());
-            _os << "}" << std::endl;
-          } else {
-            pfp.print(env->flat());
-          }
-          if (_flags.verbose) {
-            _log << " done (" << _starttime.stoptime() << ")" << std::endl;
-          }
-        } else if (!_flagOutputPaths.empty()) {
-          if (_flags.verbose) {
-            _log << "Printing Paths to '" << _flagOutputPaths << "' ..." << std::flush;
-          }
-          std::ofstream ofs(FILE_PATH(_flagOutputPaths), ios::out);
-          check_io_status(ofs.good(), " I/O error: cannot open fzn output file. ");
-          PathFilePrinter pfp(ofs, env->envi());
-          pfp.print(env->flat());
-          check_io_status(ofs.good(), " I/O error: cannot write fzn output file. ");
-          ofs.close();
-          if (_flags.verbose) {
-            _log << " done (" << _starttime.stoptime() << ")" << std::endl;
-          }
-        }
-
-        if ((_fopts.collectMznPaths || _flags.twoPass) && !_flags.keepMznPaths) {
-          class RemovePathAnnotations : public ItemVisitor {
-          public:
-            static void removePath(Annotation& a) {
-              a.removeCall(Constants::constants().ann.mzn_path);
-            }
-            static void vVarDeclI(VarDeclI* vdi) { removePath(Expression::ann(vdi->e())); }
-            static void vConstraintI(ConstraintI* ci) { removePath(Expression::ann(ci->e())); }
-            static void vSolveI(SolveI* si) {
-              removePath(si->ann());
-              if (Expression* e = si->e()) {
-                removePath(Expression::ann(e));
-              }
-            }
-          } removePaths;
-          iter_items<RemovePathAnnotations>(removePaths, env->flat());
-        }
-
-        if (_flags.outputFznStdout) {
-          if (_flags.verbose) {
-            _log << "Printing FlatZinc to stdout ..." << std::endl;
-          }
-          switch (_flags.fznFormat) {
-            case FlattenerFlags::FF_FZN: {
-              Printer p(_os, 0, true, &env->envi());
-              p.print(env->flat());
-            } break;
-            case FlattenerFlags::FF_JSON: {
-              FznJSONPrinter p(_os, env->envi());
-              p.print(env->flat());
-            } break;
-          }
-          if (_flags.verbose) {
-            _log << " done (" << _starttime.stoptime() << ")" << std::endl;
-          }
-        } else if (!_flagOutputFzn.empty()) {
-          if (_flags.verbose) {
-            _log << "Printing FlatZinc to '" << _flagOutputFzn << "' ..." << std::flush;
-          }
-          std::ofstream ofs(FILE_PATH(_flagOutputFzn), ios::out);
-          check_io_status(ofs.good(), " I/O error: cannot open fzn output file. ");
-          switch (_flags.fznFormat) {
-            case FlattenerFlags::FF_FZN: {
-              Printer p(ofs, 0, true, &env->envi());
-              p.print(env->flat());
-            } break;
-            case FlattenerFlags::FF_JSON: {
-              FznJSONPrinter p(ofs, env->envi());
-              p.print(env->flat());
-            } break;
-          }
-          check_io_status(ofs.good(), " I/O error: cannot write fzn output file. ");
-          ofs.close();
-          if (_flags.verbose) {
-            _log << " done (" << _starttime.stoptime() << ")" << std::endl;
-          }
-        }
-        if (!_flags.noOutputOzn) {
-          if (_flags.outputOznStdout) {
-            if (_flags.verbose) {
-              _log << "Printing .ozn to stdout ..." << std::endl;
-            }
-            Printer p(_os, 0, true, &env->envi());
-            Model* ozn;
-            {
-              GCLock lock;
-              ozn = copy(env->envi(), env->output());
-            }
-            type_demonomorphise_library(*env, ozn);
-            p.print(ozn);
-            if (_flags.verbose) {
-              _log << " done (" << _starttime.stoptime() << ")" << std::endl;
-            }
-          } else if (!_flagOutputOzn.empty()) {
-            if (_flags.verbose) {
-              _log << "Printing .ozn to '" << _flagOutputOzn << "' ..." << std::flush;
-            }
-            std::ofstream ofs(FILE_PATH(_flagOutputOzn), std::ios::out);
-            check_io_status(ofs.good(), " I/O error: cannot open ozn output file. ");
-            Printer p(ofs, 0, true, &env->envi());
-            Model* ozn;
-            {
-              GCLock lock;
-              ozn = copy(env->envi(), env->output());
-            }
-            type_demonomorphise_library(*env, ozn);
-            p.print(ozn);
-            check_io_status(ofs.good(), " I/O error: cannot write ozn output file. ");
-            ofs.close();
-            if (_flags.verbose) {
-              _log << " done (" << _starttime.stoptime() << ")" << std::endl;
-            }
-          }
-        }
+        }       
       }
     } else {  // !flag_typecheck
       Printer p(_os, 80, true, &env->envi());
@@ -1119,6 +952,132 @@ void Flattener::flatten(const std::string& modelString, const std::string& model
       _log << "Maximum memory " << mem / mb << " Mbytes";
     }
     _log << "." << std::endl;
+  }
+}
+
+void Flattener::save() {
+  Env* env = getEnv();
+  if (_flags.outputPathsStdout) {
+    if (_flags.verbose) {
+      _log << "Printing Paths to stdout ..." << std::endl;
+    }
+    PathFilePrinter pfp(_os, env->envi());
+    if (_flags.encapsulateJSON) {
+      _os << "{\"type\": \"paths\", \"paths\": ";
+      pfp.json(env->flat());
+      _os << "}" << std::endl;
+    } else {
+      pfp.print(env->flat());
+    }
+    if (_flags.verbose) {
+      _log << " done (" << _starttime.stoptime() << ")" << std::endl;
+    }
+  } else if (!_flagOutputPaths.empty()) {
+    if (_flags.verbose) {
+      _log << "Printing Paths to '" << _flagOutputPaths << "' ..." << std::flush;
+    }
+    std::ofstream ofs(FILE_PATH(_flagOutputPaths), ios::out);
+    check_io_status(ofs.good(), " I/O error: cannot open fzn output file. ");
+    PathFilePrinter pfp(ofs, env->envi());
+    pfp.print(env->flat());
+    check_io_status(ofs.good(), " I/O error: cannot write fzn output file. ");
+    ofs.close();
+    if (_flags.verbose) {
+      _log << " done (" << _starttime.stoptime() << ")" << std::endl;
+    }
+  }
+
+  if ((_fopts.collectMznPaths || _flags.twoPass) && !_flags.keepMznPaths) {
+    class RemovePathAnnotations : public ItemVisitor {
+    public:
+      static void removePath(Annotation& a) { a.removeCall(Constants::constants().ann.mzn_path); }
+      static void vVarDeclI(VarDeclI* vdi) { removePath(Expression::ann(vdi->e())); }
+      static void vConstraintI(ConstraintI* ci) { removePath(Expression::ann(ci->e())); }
+      static void vSolveI(SolveI* si) {
+        removePath(si->ann());
+        if (Expression* e = si->e()) {
+          removePath(Expression::ann(e));
+        }
+      }
+    } removePaths;
+    iter_items<RemovePathAnnotations>(removePaths, env->flat());
+  }
+
+  if (_flags.outputFznStdout) {
+    if (_flags.verbose) {
+      _log << "Printing FlatZinc to stdout ..." << std::endl;
+    }
+    switch (_flags.fznFormat) {
+      case FlattenerFlags::FF_FZN: {
+        Printer p(_os, 0, true, &env->envi());
+        p.print(env->flat());
+      } break;
+      case FlattenerFlags::FF_JSON: {
+        FznJSONPrinter p(_os, env->envi());
+        p.print(env->flat());
+      } break;
+    }
+    if (_flags.verbose) {
+      _log << " done (" << _starttime.stoptime() << ")" << std::endl;
+    }
+  } else if (!_flagOutputFzn.empty()) {
+    if (_flags.verbose) {
+      _log << "Printing FlatZinc to '" << _flagOutputFzn << "' ..." << std::flush;
+    }
+    std::ofstream ofs(FILE_PATH(_flagOutputFzn), ios::out);
+    check_io_status(ofs.good(), " I/O error: cannot open fzn output file. ");
+    switch (_flags.fznFormat) {
+      case FlattenerFlags::FF_FZN: {
+        Printer p(ofs, 0, true, &env->envi());
+        p.print(env->flat());
+      } break;
+      case FlattenerFlags::FF_JSON: {
+        FznJSONPrinter p(ofs, env->envi());
+        p.print(env->flat());
+      } break;
+    }
+    check_io_status(ofs.good(), " I/O error: cannot write fzn output file. ");
+    ofs.close();
+    if (_flags.verbose) {
+      _log << " done (" << _starttime.stoptime() << ")" << std::endl;
+    }
+  }
+  if (!_flags.noOutputOzn) {
+    if (_flags.outputOznStdout) {
+      if (_flags.verbose) {
+        _log << "Printing .ozn to stdout ..." << std::endl;
+      }
+      Printer p(_os, 0, true, &env->envi());
+      Model* ozn;
+      {
+        GCLock lock;
+        ozn = copy(env->envi(), env->output());
+      }
+      type_demonomorphise_library(*env, ozn);
+      p.print(ozn);
+      if (_flags.verbose) {
+        _log << " done (" << _starttime.stoptime() << ")" << std::endl;
+      }
+    } else if (!_flagOutputOzn.empty()) {
+      if (_flags.verbose) {
+        _log << "Printing .ozn to '" << _flagOutputOzn << "' ..." << std::flush;
+      }
+      std::ofstream ofs(FILE_PATH(_flagOutputOzn), std::ios::out);
+      check_io_status(ofs.good(), " I/O error: cannot open ozn output file. ");
+      Printer p(ofs, 0, true, &env->envi());
+      Model* ozn;
+      {
+        GCLock lock;
+        ozn = copy(env->envi(), env->output());
+      }
+      type_demonomorphise_library(*env, ozn);
+      p.print(ozn);
+      check_io_status(ofs.good(), " I/O error: cannot write ozn output file. ");
+      ofs.close();
+      if (_flags.verbose) {
+        _log << " done (" << _starttime.stoptime() << ")" << std::endl;
+      }
+    }
   }
 }
 

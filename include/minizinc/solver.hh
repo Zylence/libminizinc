@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <minizinc/tcp_client.hh>
 #include <minizinc/exception.hh>
 #include <minizinc/flattener.hh>
 #include <minizinc/solver_config.hh>
@@ -140,6 +141,7 @@ private:
   enum OptionStatus { OPTION_OK, OPTION_FINISH };
   /// Solver configurations
   SolverConfigs _solverConfigs;
+  TCPClient _client;
   Flattener _flt;
   SolverInstanceBase* _si = nullptr;
   SolverInstanceBase::Options* _siOpt = nullptr;
@@ -168,6 +170,7 @@ public:
   bool flagCompilerStatistics = false;
   bool flagFeatureVector = false;
   FlatModelFeatureVector::Options featureVectorOptions;
+  bool flagInjectInputOrder = false;
   bool flagEncapsulateJSON = false;
   bool flagIsSolns2out = false;
   std::chrono::milliseconds flagOverallTimeLimit = std::chrono::milliseconds(0);
@@ -199,6 +202,8 @@ private:
   /// Flatten model
   void flatten(const std::string& modelString = std::string(),
                const std::string& modelName = std::string("stdin"));
+  void extract_features(std::ostream& sink);
+  void inject_input_order(std::vector<std::string> inputOrder);
   static size_t getNSolvers() { return get_global_solver_registry()->getSolverFactories().size(); }
   /// If building a flattening exe only.
   bool ifMzn2Fzn() const;

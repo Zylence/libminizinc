@@ -26,6 +26,8 @@
 #include <minizinc/param_config.hh>
 #include <minizinc/solver.hh>
 #include <minizinc/feature_extraction.hh>
+#include <minizinc/tcp_client.hh>
+#include <minizinc/utils.hh>
 
 #include <chrono>
 #include <cstdlib>
@@ -73,6 +75,7 @@
 #include <minizinc/solvers/mzn_solverinstance.hh>
 #include <minizinc/solvers/nl/nl_solverfactory.hh>
 #include <minizinc/solvers/nl/nl_solverinstance.hh>
+#include <minizinc/json_parser.hh>
 
 using namespace std;
 using namespace MiniZinc;
@@ -187,6 +190,7 @@ void SolverFactory::destroySI(SolverInstanceBase* pSI) {
 MznSolver::MznSolver(std::ostream& os0, std::ostream& log0, const Timer& startTime)
     : _startTime(startTime),
       _solverConfigs(log0),
+      _client(),
       _flt(os0, log0, _solverConfigs.mznlibDir()),
       _executableName("<executable>"),
       _os(os0),
@@ -269,6 +273,7 @@ void MznSolver::printHelp(std::ostream& os, const std::string& selectedSolver) {
      << "  -s, --statistics\n    Print statistics." << std::endl
      << "  --compiler-statistics\n    Print statistics for compilation." << std::endl
      << "  --feature-vector, --feature-vector <(\\d*v)?(\\d*c)?(f)?>\n    Extracts and prints feature vector of the FlatZinc model.\n    Allows configuration of the feature-extraction process.\n    [0-9]+v limits variables in constraint graph, [0-9]+c limits constraints in constraint graph, f ignores floats.\n    By default uses \"0v0cf\" which will not apply padding / cropping to the constraint graph and will ignore floats." << std::endl
+     << "  --inject-input-order, --inject-input-order <PORT>\n    Communicates with a service to retrieve a static input_order heuristic." << std::endl
      << "  -c, --compile\n    Compile only (do not run solver)." << std::endl
      << "  --config-dirs\n    Output configuration directories." << std::endl
      << "  --param-file <file>\n    Load parameters from the given JSON file." << std::endl
@@ -627,6 +632,9 @@ MznSolver::OptionStatus MznSolver::processOptions(std::vector<std::string>& argv
         ++i;
       }
       flagFeatureVector = true;
+    } else if (argv[i] == "--inject-input-order") {
+      flagFeatureVector = true;
+      flagInjectInputOrder = true;
     } else if (argv[i] == "--json-stream") {
       flagEncapsulateJSON = true;
       s2out.opt.checkerArgs.emplace_back("--json-stream");
@@ -959,9 +967,6 @@ void MznSolver::flatten(const std::string& modelString, const std::string& model
   if (flagRandomSeed) {
     _flt.setRandomSeed(randomSeed);
   }
-  if (flagFeatureVector) {
-    _flt.setFlagFeatureVector(&featureVectorOptions);
-  }
 
 #ifndef __EMSCRIPTEN__
   // Create timing thread
@@ -1000,6 +1005,100 @@ void MznSolver::flatten(const std::string& modelString, const std::string& model
   // Rethrow exception if necessary
   if (exc) {
     std::rethrow_exception(exc);
+  }
+}
+
+void MznSolver::extract_features(std::ostream& sink) {
+  Env* env = _flt.getEnv();
+  StatisticsStream ss(sink, flagEncapsulateJSON, "feature_vector",
+                      "%%%mzn-fvec: ", "%%%mzn-fvec-end");
+  FlatModelFeatureVector features = extract_feature_vector(*env, featureVectorOptions);
+
+  if (!flagEncapsulateJSON) {
+    _os << "% Generated FlatZinc Feature Vector:\n";
+  }
+
+  ss.add("flatBoolVars", features.n_bool_vars);
+  ss.add("flatIntVars", features.n_int_vars);
+  ss.add("flatSetVars", features.n_set_vars);
+
+  ss.addMap("idToVarNameMap", features.customIdToVarNameMap);
+  ss.addMap("idToConstraintNameMap", features.customIdToConstraintNameMap);
+
+  ss.addArray("domainWidths", features.domain_widths);
+  ss.add("stdDeviationDomain", features.std_dev_domain_size);
+  ss.add("averageDomainSize", features.avg_domain_size);
+  ss.add("medianDomainSize", features.median_domain_size);
+  ss.add("averageDomainOverlap", features.avg_domain_overlap);
+  ss.add("numberOfDisjointPairs", features.n_disjoint_domain_pairs);
+  ss.add("metaConstraints", features.n_meta_ct);
+  ss.add("totalConstraints", features.n_total_ct);
+  ss.add("avgDecisionVarsInConstraints", features.avg_decision_vars_in_cts);
+
+  ss.add("constraintGraph", features.constraint_graph);
+  ss.addMap("constraintHistogram", features.ct_histogram);
+  ss.addMap("annotationHistogram", features.ann_histogram);
+
+  SolveI* solveItem = env->flat()->solveItem();
+  if (solveItem->st() != SolveI::SolveType::ST_SAT) {
+    if (solveItem->st() == SolveI::SolveType::ST_MAX) {
+      ss.add("method", "maximize");
+    } else {
+      ss.add("method", "minimize");
+    }
+  } else {
+    ss.add("method", "satisfy");
+  }
+}
+
+/**
+Replaces the variable ordering of the flat model with the inputOrder provided.
+Replaces the search annotation with input_order. 
+*/
+void MznSolver::inject_input_order(std::vector<std::string> inputOrder) {
+  Model* flat = _flt.getEnv()->flat();
+  EnvI& envi = _flt.getEnv()->envi();
+  SolveI* si = flat->solveItem();
+  if (!si->ann().isEmpty()) {
+
+    for (auto& ann : si->ann()) {
+      if (Expression::isa<Call>(ann)) {
+        Call* call = Expression::dynamicCast<Call>(ann);
+        if (call->argCount() > 0) {
+          if (Id* call_id = Expression::dynamicCast<Id>(call->arg(1))) {
+            ASTString search_heuristic = call_id->str();
+            if (search_heuristic == "input_order") {
+              auto a = call->arg(0);
+              ArrayLit* flat_model_var_ordering = eval_array_lit(envi, a);
+              auto flat_model_var_ordering_vec = flat_model_var_ordering->getVec();
+
+              // for any var in input order
+              // find position of var in current input order by name
+              // swap current position with position encoded by inputOrder vector
+
+              for (size_t i = 0; i < inputOrder.size(); ++i) {
+                auto var_that_should_be_in_pos_i = inputOrder[i];
+                for (size_t j = i; j < flat_model_var_ordering_vec.size(); j++) {
+                  auto var_found_at_j = flat_model_var_ordering_vec[j];
+
+                  if (Expression::isa<Id>(var_found_at_j)) {
+                    Id* var_id = Expression::dynamicCast<Id>(var_found_at_j);
+                    if (var_id->decl() != nullptr) {
+                      var_id = var_id->decl()->id();  // todo check if we need this
+                      if (var_id->str().c_str() == var_that_should_be_in_pos_i) {
+                        std::swap(flat_model_var_ordering_vec[i], flat_model_var_ordering_vec[j]);
+                      }
+                    }
+                    // in else case var is a const!
+                  }
+                  // in else case var is a const!
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -1100,6 +1199,28 @@ SolverInstance::Status MznSolver::run(const std::vector<std::string>& args0,
     s2out.evalStatus(SolverInstance::UNKNOWN);
     return SolverInstance::UNKNOWN;
   }
+
+  if (flagFeatureVector) {
+    StreamMultiplexer multiplexer;
+    multiplexer.addStream(&_os);
+    if (flagInjectInputOrder) {
+      if (_client.connect()) {
+        multiplexer.addStream(&_client);
+        JSONParser jp(_flt.getEnv()->envi());
+
+        extract_features(multiplexer);
+        auto responseStr = _client.receive();
+        std::istringstream inputStream(responseStr);
+        auto jsonResponse = jp.parseValue2(inputStream);
+        inject_input_order(jsonResponse.objectValue["ordering"].getVec<std::string>());
+      }
+      //todo exception (conn err)
+    } else {
+      extract_features(multiplexer);
+    }
+  }
+
+  _flt.save();
 
   if (!ifMzn2Fzn()) {
     if (flagOverallTimeLimit + flagSolverTimeLimit > std::chrono::milliseconds(0)) {

@@ -26,7 +26,6 @@
 #include <minizinc/timer.hh>
 #include <minizinc/typecheck.hh>
 #include <minizinc/utils.hh>
-#include <minizinc/feature_extraction.hh>
 
 #include <ctime>
 #include <iomanip>
@@ -55,6 +54,8 @@ public:
 
   void flatten(const std::string& modelString = std::string(),
                const std::string& modelName = std::string("stdin"));
+  // save to disk - decoupled from flattening process - allows for more flexible call hierarchy
+  void save();
   void printStatistics(std::ostream& os);
 
   void cancel() {
@@ -66,10 +67,6 @@ public:
   bool getFlagVerbose() const { return _flags.verbose; }
   void setFlagStatistics(bool f) { _flags.statistics = f; }
   bool getFlagStatistics() const { return _flags.statistics; }
-  void setFlagFeatureVector(FlatModelFeatureVector::Options* options) {
-    _flags.featureVector = options;
-  }
-  FlatModelFeatureVector::Options* getFlagFeatureVector() { return _flags.featureVector; }
   void setFlagEncapsulateJSON(bool f) { _flags.encapsulateJSON = f; }
   bool getFlagEncapsulateJSON() const { return _flags.encapsulateJSON; }
   void setRandomSeed(long unsigned int r) { _fopts.randomSeed = r; }
@@ -107,7 +104,6 @@ private:
     bool allowUnboundedVars = false;
     bool noMIPdomains = false;
     bool statistics = false;
-    FlatModelFeatureVector::Options* featureVector = nullptr;
     bool stdinInput = false;
     bool allowMultiAssign = false;
     bool gecode = false;
