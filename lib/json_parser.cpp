@@ -945,4 +945,86 @@ bool JSONParser::fileIsJSON(const std::string& filename) {
   return is_json(is);
 }
 
+JSONValue JSONParser::parseObject2(std::istream& is) {
+  JSONValue obj;
+  obj.type = JSONValue::OBJECT;
+
+  while (true) {
+    Token key = readToken(is);
+    if (key.t == T_OBJ_CLOSE) break;
+    if (key.t != T_STRING) throw std::runtime_error("Expected string key in object");
+    expectToken(is, T_COLON);
+    obj.objectValue[key.s] = parseValue2(is);
+
+    Token next = readToken(is);
+    if (next.t == T_OBJ_CLOSE) break;
+    expectToken(is, T_COMMA);
+  }
+  return obj;
+}
+
+JSONValue JSONParser::parseArray2(std::istream& is) {
+  JSONValue arr;
+  arr.type = JSONValue::ARRAY;
+
+  while (true) {
+    Token lookahead = readToken(is);
+    if (lookahead.t == T_LIST_CLOSE) break;
+
+    auto strtok = lookahead.toString();
+    // putback - little bit hacky - has performance drawdowns, todo find better solution
+    for (auto it = strtok.rbegin(); it != strtok.rend(); ++it) {
+      is.putback(*it);
+    }
+
+    arr.arrayValue.push_back(parseValue2(is));
+
+    Token sep = readToken(is);
+    if (sep.t == T_LIST_CLOSE) break;
+    if (sep.t == T_COMMA) continue;
+  }
+  return arr;
+}
+
+JSONValue JSONParser::parseValue2(std::istream& is) {
+  Token tok = readToken(is);
+  switch (tok.t) {
+    case T_OBJ_OPEN:
+      return parseObject2(is);
+    case T_LIST_OPEN:
+      return parseArray2(is);
+    case T_INT:
+    case T_FLOAT: {
+      JSONValue val;
+      val.type = JSONValue::NUMBER;
+      if (tok.t == T_INT)
+        val.numberValue = tok.i;
+      else if (tok.t == T_FLOAT)
+        val.numberValue = tok.d;
+      else
+        throw std::runtime_error("Expected number token");
+      return val;
+    }
+    case T_STRING: {
+      JSONValue val;
+      val.type = JSONValue::STRING;
+      val.stringValue = tok.s;
+      return val;
+    }
+    case T_BOOL: {
+      JSONValue val;
+      val.type = JSONValue::BOOL;
+      val.boolValue = tok.b;
+      return val;
+    }
+    case T_NULL: {
+      JSONValue val;
+      val.type = JSONValue::NIL;
+      return val;
+    }
+    default:
+      throw std::runtime_error("Unexpected token");
+  }
+}
+
 }  // namespace MiniZinc

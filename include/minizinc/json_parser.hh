@@ -27,6 +27,51 @@ public:
   const char* what() const throw() override { return "JSON parsing error"; }
 };
 
+class JSONValue {
+public:
+  enum Type { OBJECT, ARRAY, NUMBER, STRING, BOOL, NIL } type;
+  std::map<std::string, JSONValue> objectValue;
+  std::vector<JSONValue> arrayValue;
+  double numberValue;
+  std::string stringValue;
+  bool boolValue;
+
+  JSONValue() : type(NIL), numberValue(0), boolValue(false) {}
+
+  template <typename T>
+  std::vector<T> getVec() const {
+    if (type != ARRAY) {
+      throw std::runtime_error("JSONValue is not an array.");
+    }
+
+    std::vector<T> result;
+    for (const auto& item : arrayValue) {
+      if constexpr (std::is_same<T, std::string>::value) {
+        if (item.type == STRING) {
+          result.push_back(item.stringValue);
+        } else {
+          throw std::runtime_error("Type mismatch in array.");
+        }
+      } else if constexpr (std::is_same<T, double>::value) {
+        if (item.type == NUMBER) {
+          result.push_back(item.numberValue);
+        } else {
+          throw std::runtime_error("Type mismatch in array.");
+        }
+      } else if constexpr (std::is_same<T, bool>::value) {
+        if (item.type == BOOL) {
+          result.push_back(item.boolValue);
+        } else {
+          throw std::runtime_error("Type mismatch in array.");
+        }
+      } else {
+        throw std::runtime_error("Unsupported type.");
+      }
+    }
+    return result;
+  }
+};
+
 class JSONParser {
 protected:
   enum TokenT {
@@ -44,14 +89,14 @@ protected:
     T_EOF
   } _t;
 
-  class Token;
   EnvI& _env;
   int _line;
   int _column;
   std::string _filename;
   Location errLocation() const;
-  Token readToken(std::istream& is);
+  class Token;
   Token readTokenInternal(std::istream& is);
+  Token readToken(std::istream& is);
   void expectToken(std::istream& is, TokenT t);
   std::string expectString(std::istream& is);
   int expectInt(std::istream& is);
@@ -77,6 +122,10 @@ public:
   static bool stringIsJSON(const std::string& data);
   /// Coerces a array literal to take shape and (tuple) type
   Expression* coerceArray(TypeInst* intendedTI, ArrayLit* al);
-};
 
+  JSONValue parseObject2(std::istream& is);
+  JSONValue parseArray2(std::istream& is);
+  JSONValue parseNumber2(std::istream& is);
+  JSONValue parseValue2(std::istream& is);
+};
 }  // namespace MiniZinc
