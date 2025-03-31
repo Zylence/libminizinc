@@ -1066,33 +1066,32 @@ void MznSolver::inject_input_order(std::vector<std::string> inputOrder) {
         Call* call = Expression::dynamicCast<Call>(ann);
         if (call->argCount() > 0) {
           if (Id* call_id = Expression::dynamicCast<Id>(call->arg(1))) {
-            ASTString search_heuristic = call_id->str();
-            if (search_heuristic == "input_order") {
-              auto a = call->arg(0);
-              ArrayLit* flat_model_var_ordering = eval_array_lit(envi, a);
-              auto flat_model_var_ordering_vec = flat_model_var_ordering->getVec();
+            call_id->v(ASTString("input_order")); //todo is there a const?
+            //ASTString search_heuristic = call_id->str();  //todo do we need sanity checks before?
+            auto a = call->arg(0);
+            ArrayLit* flat_model_var_ordering = eval_array_lit(envi, a);
+            auto flat_model_var_ordering_vec = flat_model_var_ordering->getVec();
 
-              // for any var in input order
-              // find position of var in current input order by name
-              // swap current position with position encoded by inputOrder vector
+            // for any var in input order
+            // find position of var in current input order by name
+            // swap current position with position encoded by inputOrder vector
 
-              for (size_t i = 0; i < inputOrder.size(); ++i) {
-                auto var_that_should_be_in_pos_i = inputOrder[i];
-                for (size_t j = i; j < flat_model_var_ordering_vec.size(); j++) {
-                  auto var_found_at_j = flat_model_var_ordering_vec[j];
+            for (size_t i = 0; i < inputOrder.size(); ++i) {
+              auto var_that_should_be_in_pos_i = inputOrder[i];
+              for (size_t j = i; j < flat_model_var_ordering_vec.size(); j++) {
+                auto var_found_at_j = flat_model_var_ordering_vec[j];
 
-                  if (Expression::isa<Id>(var_found_at_j)) {
-                    Id* var_id = Expression::dynamicCast<Id>(var_found_at_j);
-                    if (var_id->decl() != nullptr) {
-                      var_id = var_id->decl()->id();  // todo check if we need this
-                      if (var_id->str().c_str() == var_that_should_be_in_pos_i) {
-                        std::swap(flat_model_var_ordering_vec[i], flat_model_var_ordering_vec[j]);
-                      }
+                if (Expression::isa<Id>(var_found_at_j)) {
+                  Id* var_id = Expression::dynamicCast<Id>(var_found_at_j);
+                  if (var_id->decl() != nullptr) {
+                    var_id = var_id->decl()->id();  // todo check if we need this
+                    if (var_id->str().c_str() == var_that_should_be_in_pos_i) {
+                      std::swap(flat_model_var_ordering_vec[i], flat_model_var_ordering_vec[j]);
                     }
-                    // in else case var is a const!
                   }
                   // in else case var is a const!
                 }
+                // in else case var is a const!
               }
             }
           }
