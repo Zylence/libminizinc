@@ -41,6 +41,7 @@ add_library(mzn
   lib/htmlprinter.cpp
   lib/json_parser.cpp
   lib/lexer.lxx
+  lib/tcp_client.cpp
   lib/thirdparty/cdecode.c
   lib/thirdparty/cencode.c
   lib/thirdparty/miniz.c
@@ -112,6 +113,7 @@ add_library(mzn
   include/minizinc/stackdump.hh
   include/minizinc/statistics.hh
   include/minizinc/support/regex.hh
+  include/minizinc/tcp_client.hh
   include/minizinc/_thirdparty/b64/cdecode.h
   include/minizinc/_thirdparty/b64/cencode.h
   include/minizinc/_thirdparty/b64/decode.h

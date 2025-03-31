@@ -14,6 +14,7 @@
 #ifdef _WIN32
 
 #define NOMINMAX  // Ensure the words min/max remain available
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #undef ERROR
 #include <sstream>
