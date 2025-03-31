@@ -28,6 +28,7 @@
 #include <vector>
 #include <type_traits>
 
+
 #ifdef MZN_HAS_LLROUND
 #include <cmath>
 namespace MiniZinc {
@@ -272,6 +273,47 @@ public:
 #endif
   static void setEnv(Env& env);
   static void removeEnv();
+};
+
+class StreamMultiplexer : public std::ostream {
+public:
+  StreamMultiplexer() : std::ostream(&buffer) {}
+
+  void addStream(std::ostream* stream) { streams.push_back(stream); }
+
+protected:
+  class StreamBuffer : public std::streambuf {
+  public:
+    StreamBuffer(StreamMultiplexer& multiplexer) : multiplexer(multiplexer) {}
+
+  protected:
+    int overflow(int c) override {
+      if (c != EOF) {
+        for (auto& stream : multiplexer.streams) {
+          if (stream) {
+            *stream << static_cast<char>(c);
+          }
+        }
+      }
+      return c;
+    }
+
+    int sync() override {
+      for (auto& stream : multiplexer.streams) {
+        if (stream) {
+          stream->flush();
+        }
+      }
+      return 0;
+    }
+
+  private:
+    StreamMultiplexer& multiplexer;
+  };
+
+private:
+  StreamBuffer buffer{*this};
+  std::vector<std::ostream*> streams;
 };
 
 class SemanticVersion {
