@@ -122,7 +122,6 @@ public:
   static bool stringIsJSON(const std::string& data);
   /// Coerces a array literal to take shape and (tuple) type
   Expression* coerceArray(TypeInst* intendedTI, ArrayLit* al);
-
   JSONValue parseObject2(std::istream& is);
   JSONValue parseArray2(std::istream& is);
   JSONValue parseNumber2(std::istream& is);
