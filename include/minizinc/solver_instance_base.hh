@@ -38,6 +38,7 @@ public:
   public:
     bool verbose = false;
     bool printStatistics = false;
+    virtual ~Options() = default;
   };
 
 protected:
