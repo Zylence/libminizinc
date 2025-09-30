@@ -175,12 +175,8 @@ public:
       _os << "any";
       return;
     }
-    switch (type.ti()) {
-      case Type::TI_PAR:
-        break;
-      case Type::TI_VAR:
-        _os << "var ";
-        break;
+    if (type.isvar() && !type.structBT()) {
+      _os << "var ";
     }
     if (type.ot() == Type::OT_OPTIONAL) {
       _os << "opt ";
@@ -1286,12 +1282,8 @@ Document* tiexpression_to_document(const Type& type, const Expression* e, EnvI* 
   if (type.any()) {
     dl->addStringToList("any ");
   } else {
-    switch (type.ti()) {
-      case Type::TI_PAR:
-        break;
-      case Type::TI_VAR:
-        dl->addStringToList("var ");
-        break;
+    if (type.isvar() && !type.structBT()) {
+      dl->addStringToList("var ");
     }
     if (type.ot() == Type::OT_OPTIONAL) {
       dl->addStringToList("opt ");

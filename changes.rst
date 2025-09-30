@@ -4,6 +4,16 @@ MiniZinc Change Log
 For detailed bug reports consult the issue tracker at
 https://github.com/MiniZinc/libminizinc/issues.
 
+.. _upcoming:
+
+Upcoming Release
+~~~~~~~~~~~~~~~~
+
+Bug fixes:
+^^^^^^^^^^
+-  Fix type checking for tuple and record literals to correctly reflect whether
+   they contain any variable types (:bugref:`955`).
+
 .. _v2.9.4:
 
 `Version 2.9.4 <https://github.com/MiniZinc/MiniZincIDE/releases/tag/2.9.4>`__

@@ -472,7 +472,9 @@ std::string Type::toString(const EnvI& env) const {
       }
       break;
     case TI_VAR:
-      oss << "var ";
+      if (!structBT()) {
+        oss << "var ";
+      }
       break;
   }
   if (static_cast<OptType>(_ot) == OT_OPTIONAL) {
@@ -570,7 +572,9 @@ std::string Type::simpleToString() const {
       }
       break;
     case TI_VAR:
-      oss << "var ";
+      if (!structBT()) {
+        oss << "var ";
+      }
       break;
   }
   if (static_cast<OptType>(_ot) == OT_OPTIONAL) {

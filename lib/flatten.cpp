@@ -1292,7 +1292,7 @@ unsigned int EnvI::registerTupleType(TypeInst* ti) {
 
   std::vector<Type> fields(isArrayOfArray ? 2 : dom->size());
   bool cv = false;
-  bool var = true;
+  bool var = false;
   for (unsigned int i = 0; i < dom->size(); i++) {
     auto* tii = Expression::cast<TypeInst>((*dom)[i]);
 
@@ -1305,7 +1305,7 @@ unsigned int EnvI::registerTupleType(TypeInst* ti) {
 
     fields[i] = tii->type();
     cv = cv || fields[i].isvar() || fields[i].cv();
-    var = var && fields[i].isvar();
+    var = var || fields[i].isvar();
   }
   if (isArrayOfArray) {
     // Add marker for array of array
@@ -1347,11 +1347,11 @@ unsigned int EnvI::registerTupleType(ArrayLit* tup) {
   ty.typeId(0);  // Reset any current TypeId
   std::vector<Type> fields(isArrayOfArray ? 2 : tup->size());
   bool cv = false;
-  bool var = true;
+  bool var = false;
   for (unsigned int i = 0; i < tup->size(); i++) {
     fields[i] = Expression::type((*tup)[i]);
     cv = cv || fields[i].isvar() || fields[i].cv();
-    var = var && fields[i].isvar();
+    var = var || fields[i].isvar();
     assert(!fields[i].structBT() || fields[i].typeId() != 0);
   }
   if (isArrayOfArray) {
@@ -1527,7 +1527,7 @@ Type EnvI::mergeRecord(Type record1, Type record2, Location loc) {
   }
   assert(r + l == all_fields.size());
   unsigned int typeId = registerRecordType(all_fields);
-  bool is_var = record1.ti() == record2.ti() && record1.ti() == Type::TI_VAR;
+  bool is_var = record1.ti() == Type::TI_VAR || record2.ti() == Type::TI_VAR;
   bool is_cv = record1.cv() || record2.cv();
 
   Type ret = Type::record(0, 0);  // Delay TypeId until TI and CV is set
@@ -1550,7 +1550,7 @@ Type EnvI::concatTuple(Type tuple1, Type tuple2) {
   }
   unsigned int typeId = registerTupleType(all_fields);
 
-  bool is_var = tuple1.ti() == tuple2.ti() && tuple1.ti() == Type::TI_VAR;
+  bool is_var = tuple1.ti() == Type::TI_VAR || tuple2.ti() == Type::TI_VAR;
   bool is_cv = tuple1.cv() || tuple2.cv();
 
   Type ret = Type::tuple(0, 0);  // Delay TypeId until TI and CV is set
