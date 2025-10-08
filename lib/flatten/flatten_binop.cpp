@@ -1065,11 +1065,11 @@ bool flatten_dom_constraint(EnvI& env, Ctx& ctx, VarDecl* vd, Expression* dom, V
 /// converted to an table constraint as an optimization.
 bool check_struct_table(EnvI& env, Type elem_t, Type arr_t) {
   assert(elem_t.structBT() && arr_t.structBT());  // No need to check otherwise
-  if (arr_t.cv()) {
+  if (arr_t.isvar()) {
     // Cannot be made into a table
     return false;
   }
-  if (!elem_t.cv()) {
+  if (elem_t.isPar()) {
     // Par LHS, can be checked directly
     return false;
   }
@@ -1087,7 +1087,7 @@ bool check_struct_table(EnvI& env, Type elem_t, Type arr_t) {
     }
     Type t = (*b.first)[b.second];
     b.second++;
-    if (!t.cv()) {
+    if (t.isPar()) {
       continue;
     }
     switch (t.bt()) {
@@ -1172,7 +1172,7 @@ ArrayLit* struct_as_array(EnvI& env, ArrayLit* obj, bool filter_par = false) {
   std::vector<Expression*> elems;
   bool all_bool = true;
   bool has_bool = false;
-  bool is_par = !Expression::type(obj).cv();
+  bool is_par = Expression::type(obj).isPar();
 
   std::vector<std::pair<ArrayLit*, unsigned int>> stack{{obj, 0}};
   while (!stack.empty()) {
@@ -1184,7 +1184,7 @@ ArrayLit* struct_as_array(EnvI& env, ArrayLit* obj, bool filter_par = false) {
     auto* elem = (*b.first)[b.second];
     b.second++;
     Type t = Expression::type(elem);
-    if (filter_par && !t.cv()) {
+    if (filter_par && t.isPar()) {
       continue;
     }
     assert(t.dim() == 0 && t.st() != Type::ST_SET);
@@ -1235,7 +1235,7 @@ ArrayLit* struct_as_array(EnvI& env, ArrayLit* obj, bool filter_par = false) {
 /// `par` for `obj`, and will remove any rows in which these members do not
 /// match the members of `obj`.
 ArrayLit* struct_as_table(EnvI& env, ArrayLit* table, ArrayLit* obj) {
-  assert(Expression::type(table).dim() == 1 && !Expression::type(table).cv() &&
+  assert(Expression::type(table).dim() == 1 && Expression::type(table).isPar() &&
          Expression::type(table).structBT());
   assert(Expression::type(obj).structBT());
   assert(GC::locked());
@@ -1261,7 +1261,7 @@ ArrayLit* struct_as_table(EnvI& env, ArrayLit* table, ArrayLit* obj) {
 
       Type t = Expression::type(obj_elem);
       // Par on `obj` -> remove row if not equal, otherwise ignore element
-      if (!t.cv()) {
+      if (t.isPar()) {
         Expression* r = eval_par(env, row_elem);
         Expression* o = eval_par(env, obj_elem);
         if (Expression::equal(r, o)) {
@@ -1467,9 +1467,7 @@ EE flatten_bool_op(EnvI& env, Ctx& ctx, const Ctx& ctx0, const Ctx& ctx1, Expres
     return ret;
   }
 
-  if (Expression::type(e0.r()).structBT()
-          ? (!Expression::type(e0.r()).cv() && !Expression::type(e1.r()).cv())
-          : (Expression::type(e0.r()).isPar() && Expression::type(e1.r()).isPar())) {
+  if (Expression::type(e0.r()).isPar() && Expression::type(e1.r()).isPar()) {
     GCLock lock;
     auto* bo_par = new BinOp(Expression::loc(e), e0.r(), bot, e1.r());
     std::vector<Expression*> args({e0.r(), e1.r()});
