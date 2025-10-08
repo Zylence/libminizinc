@@ -1699,7 +1699,7 @@ unsigned int EnvI::registerRecordType(TypeInst* ti) {
 
   // Register new Record
   bool cv = false;
-  bool var = true;
+  bool var = false;
   unsigned int ret;
   if (ti->type().typeId() == 0) {
     std::vector<std::pair<ASTString, Type>> field_pairs(dom->size());
@@ -1717,7 +1717,7 @@ unsigned int EnvI::registerRecordType(TypeInst* ti) {
       }
 
       cv = cv || fields[i]->type().isvar() || fields[i]->type().cv();
-      var = var && fields[i]->type().isvar();
+      var = var || fields[i]->type().isvar();
     }
 
     // Sort fields (and literal content)
@@ -1743,7 +1743,7 @@ unsigned int EnvI::registerRecordType(TypeInst* ti) {
       types[i] = Expression::type((*dom)[i]);
 
       cv = cv || Expression::type((*dom)[i]).isvar() || Expression::type((*dom)[i]).cv();
-      var = var && Expression::type((*dom)[i]).isvar();
+      var = var || Expression::type((*dom)[i]).isvar();
     }
     ret = registerRecordType(orig, types);
   }
