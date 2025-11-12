@@ -1,5 +1,5 @@
 predicate fzn_nvalue_reif(var int: n, array [int] of var int: x, var bool: b) =
-  if x = [] then b <-> n=0 else
+  if length(x) = 0 then b <-> n=0 else
   let {
     int: lx = lb_array(x);
     int: ux = ub_array(x);

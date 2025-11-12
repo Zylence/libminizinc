@@ -13,6 +13,7 @@ Bug fixes:
 ^^^^^^^^^^
 -  Fix type checking for tuple and record literals to correctly reflect whether
    they contain any variable types (:bugref:`955`).
+-  Fix bug in decomposition for the reified ``nvalue`` global (:bugref:`964`).
 
 .. _v2.9.4:
 
