@@ -43,6 +43,7 @@ extensions = [
     "playground",
     "sphinxtogithub",
     "notfound.extension",
+    'sphinx_copybutton',
 ]
 
 inline_highlight_respect_highlight = False
