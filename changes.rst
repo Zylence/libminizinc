@@ -16,6 +16,8 @@ Bug fixes:
 -  Fix bug in decomposition for the reified ``nvalue`` global (:bugref:`964`).
 -  Fix issue where output items were evaluated twice when using JSON streaming
    output mode
+-  Fix bug in type inference for arrays of tuples or records containing
+   a mix of optional and non-optional arrays (:bugref:`963`).
 
 .. _v2.9.4:
 

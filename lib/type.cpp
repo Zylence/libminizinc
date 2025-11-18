@@ -395,6 +395,8 @@ Type Type::commonType(EnvI& env, Type t1, Type t2) {
       arrayEnum.back() = commonEl.typeId();
 
       Type commonArray = commonEl;
+      commonArray.typeId(0);
+      commonArray.dim(t1.dim());
       commonArray.typeId(env.registerArrayEnum(arrayEnum));
       return commonArray;
     }
