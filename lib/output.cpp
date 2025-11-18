@@ -1580,17 +1580,26 @@ void create_output(EnvI& e, FlatteningOptions::OutputMode outputMode, bool outpu
   OutputI* outputItem = nullptr;
   GCLock lock;
 
+  // Let items to ensure output with side effects is only evaluated once
+  std::vector<Expression*> let_items;
+
   // Combine output sections into one string
   bool generateDefault = e.outputSections.noUserDefined();
   Expression* o = nullptr;
-  for (const auto& it : e.outputSections) {
+  for (auto& it : e.outputSections) {
     if (!e.outputSectionEnabled(it.section)) {
       continue;
     }
+    ASTExprVec<TypeInst> r({new TypeInst(Location().introduce(), Type::parint())});
+    auto* ti = new TypeInst(Location().introduce(), Expression::type(it.e), r);
+    auto* vd = new VarDecl(Location().introduce(), ti, e.genId(), it.e);
+    vd->toplevel(false);
+    it.e = vd->id();
+    let_items.push_back(vd);
     if (o == nullptr) {
-      o = it.e;
+      o = vd->id();
     } else {
-      o = new BinOp(Location().introduce(), o, BOT_PLUSPLUS, it.e);
+      o = new BinOp(Location().introduce(), o, BOT_PLUSPLUS, vd->id());
       Expression::type(o, Type::parstring(1));
     }
   }
@@ -1639,6 +1648,10 @@ void create_output(EnvI& e, FlatteningOptions::OutputMode outputMode, bool outpu
   if (o == nullptr) {
     // All sections disabled
     o = new ArrayLit(Location().introduce(), std::vector<Expression*>());
+    Expression::type(o, Type::parstring(1));
+  }
+  if (!let_items.empty()) {
+    o = new Let(Location().introduce(), let_items, o);
     Expression::type(o, Type::parstring(1));
   }
   auto* newOutputItem = new OutputI(Location().introduce(), o);

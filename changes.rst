@@ -14,6 +14,8 @@ Bug fixes:
 -  Fix type checking for tuple and record literals to correctly reflect whether
    they contain any variable types (:bugref:`955`).
 -  Fix bug in decomposition for the reified ``nvalue`` global (:bugref:`964`).
+-  Fix issue where output items were evaluated twice when using JSON streaming
+   output mode
 
 .. _v2.9.4:
 
