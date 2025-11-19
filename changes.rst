@@ -21,6 +21,7 @@ Bug fixes:
 -  Fix typing of indexed comprehensions that create arrays of arrays.
 -  Fix output of arrays with optional elements in cases where the array
    definition cannot be moved to the output model.
+-  Fix domain bounds when hoisting if-then-else expressions.
 
 .. _v2.9.4:
 

@@ -440,29 +440,20 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
   for (unsigned int j = 0; j < results.size(); j++) {
     auto* nr = Expression::cast<VarDecl>(results[j]());
     GCLock lock;
-    if (r_bounds_valid_int[j] && ite->type().isint()) {
+    if (r_bounds_valid_int[j] && nr->type().isint()) {
       IntVal lb = IntVal::infinity();
       IntVal ub = -IntVal::infinity();
       for (auto& i : r_bounds_int[j]) {
         lb = std::min(lb, i.l);
         ub = std::max(ub, i.u);
       }
-      if (nr->ti()->domain() != nullptr) {
-        IntSetVal* isv = eval_intset(env, nr->ti()->domain());
-        Ranges::Const<IntVal> ite_r(lb, ub);
-        IntSetRanges isv_r(isv);
-        Ranges::Inter<IntVal, Ranges::Const<IntVal>, IntSetRanges> inter(ite_r, isv_r);
-        IntSetVal* isv_new = IntSetVal::ai(inter);
-        if (!isv_new->equal(isv)) {
-          auto* r_dom = new SetLit(Location().introduce(), isv_new);
-          nr->ti()->domain(r_dom);
-        }
-      } else {
-        auto* r_dom = new SetLit(Location().introduce(), IntSetVal::a(lb, ub));
-        nr->ti()->domain(r_dom);
-        nr->ti()->setComputedDomain(true);
+      if (lb.isFinite() || ub.isFinite()) {
+        auto* nr_in = new BinOp(Location().introduce(), nr->id(), BOT_IN,
+                                new SetLit(Location().introduce(), IntSetVal::a(lb, ub)));
+        nr_in->type(Type::varbool());
+        (void)flat_exp(env, Ctx(), nr_in, env.constants.varTrue, env.constants.varTrue);
       }
-    } else if (r_bounds_valid_set[j] && ite->type().isIntSet()) {
+    } else if (r_bounds_valid_set[j] && nr->type().isIntSet()) {
       IntSetVal* isv_branches = IntSetVal::a();
       for (auto& i : r_bounds_set[j]) {
         IntSetRanges i0(isv_branches);
@@ -470,40 +461,24 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
         Ranges::Union<IntVal, IntSetRanges, IntSetRanges> u(i0, i1);
         isv_branches = IntSetVal::ai(u);
       }
-      if (nr->ti()->domain() != nullptr) {
-        IntSetVal* isv = eval_intset(env, nr->ti()->domain());
-        IntSetRanges isv_r(isv);
-        IntSetRanges isv_branches_r(isv_branches);
-        Ranges::Inter<IntVal, IntSetRanges, IntSetRanges> inter(isv_branches_r, isv_r);
-        IntSetVal* isv_new = IntSetVal::ai(inter);
-        if (!isv_new->equal(isv)) {
-          auto* r_dom = new SetLit(Location().introduce(), isv_new);
-          nr->ti()->domain(r_dom);
-        }
-      } else {
-        auto* r_dom = new SetLit(Location().introduce(), isv_branches);
-        nr->ti()->domain(r_dom);
-        nr->ti()->setComputedDomain(true);
+      if (isv_branches->min().isFinite() || isv_branches->max().isFinite()) {
+        auto* nr_in = new BinOp(Location().introduce(), nr->id(), BOT_SUBSET,
+                                new SetLit(Location().introduce(), isv_branches));
+        nr_in->type(Type::varbool());
+        (void)flat_exp(env, Ctx(), nr_in, env.constants.varTrue, env.constants.varTrue);
       }
-    } else if (r_bounds_valid_float[j] && ite->type().isfloat()) {
+    } else if (r_bounds_valid_float[j] && nr->type().isfloat()) {
       FloatVal lb = FloatVal::infinity();
       FloatVal ub = -FloatVal::infinity();
       for (auto& i : r_bounds_float[j]) {
         lb = std::min(lb, i.l);
         ub = std::max(ub, i.u);
       }
-      if (nr->ti()->domain() != nullptr) {
-        FloatSetVal* isv = eval_floatset(env, nr->ti()->domain());
-        Ranges::Const<FloatVal> ite_r(lb, ub);
-        FloatSetRanges isv_r(isv);
-        Ranges::Inter<FloatVal, Ranges::Const<FloatVal>, FloatSetRanges> inter(ite_r, isv_r);
-        FloatSetVal* fsv_new = FloatSetVal::ai(inter);
-        auto* r_dom = new SetLit(Location().introduce(), fsv_new);
-        nr->ti()->domain(r_dom);
-      } else {
-        auto* r_dom = new SetLit(Location().introduce(), FloatSetVal::a(lb, ub));
-        nr->ti()->domain(r_dom);
-        nr->ti()->setComputedDomain(true);
+      if (lb.isFinite() || ub.isFinite()) {
+        auto* nr_in = new BinOp(Location().introduce(), nr->id(), BOT_IN,
+                                new SetLit(Location().introduce(), FloatSetVal::a(lb, ub)));
+        nr_in->type(Type::varbool());
+        (void)flat_exp(env, Ctx(), nr_in, env.constants.varTrue, env.constants.varTrue);
       }
     }
   }
