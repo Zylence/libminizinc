@@ -19,6 +19,8 @@ Bug fixes:
 -  Fix bug in type inference for arrays of tuples or records containing
    a mix of optional and non-optional arrays (:bugref:`963`).
 -  Fix typing of indexed comprehensions that create arrays of arrays.
+-  Fix output of arrays with optional elements in cases where the array
+   definition cannot be moved to the output model.
 
 .. _v2.9.4:
 

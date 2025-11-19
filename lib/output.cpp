@@ -1036,7 +1036,7 @@ Expression* create_dzn_output(EnvI& e, bool includeObjective, bool includeOutput
             Comprehension* indexes;
             Comprehension* values;
             auto* index_set = Call::a(Location().introduce(), "index_set", {vd->id()});
-            index_set->type(Type::varsetint());
+            index_set->type(Type::parsetint());
             index_set->decl(e.model->matchFn(e, index_set, false));
 
             {
@@ -1070,7 +1070,17 @@ Expression* create_dzn_output(EnvI& e, bool includeObjective, bool includeOutput
               vd_t.typeId(xEnumId);
               aa->type(vd_t);
 
-              auto* show_i = Call::a(Location().introduce(), ASTString("showDzn"), {aa});
+              Expression* aa_e = aa;
+              if (vd_t.istuple()) {
+                auto* tupleType = e.getTupleType(vd_t);
+                if (tupleType->size() == 2 && (*tupleType)[1].isunknown()) {
+                  // Yes: insert field access
+                  aa_e = new FieldAccess(Expression::loc(aa).introduce(), aa, IntLit::a(1));
+                  Expression::type(aa_e, (*tupleType)[0]);
+                }
+              }
+
+              auto* show_i = Call::a(Location().introduce(), ASTString("showDzn"), {aa_e});
               show_i->type(Type::parstring());
               FunctionI* fi = e.model->matchFn(e, show_i, false);
               assert(fi);
@@ -1180,7 +1190,17 @@ Expression* create_dzn_output(EnvI& e, bool includeObjective, bool includeOutput
               vd_t.typeId(xEnumId);
               aa->type(vd_t);
 
-              auto* show_i = Call::a(Location().introduce(), ASTString("showDzn"), {aa});
+              Expression* aa_e = aa;
+              if (vd_t.istuple()) {
+                auto* tupleType = e.getTupleType(vd_t);
+                if (tupleType->size() == 2 && (*tupleType)[1].isunknown()) {
+                  // Yes: insert field access
+                  aa_e = new FieldAccess(Expression::loc(aa).introduce(), aa, IntLit::a(1));
+                  Expression::type(aa_e, (*tupleType)[0]);
+                }
+              }
+
+              auto* show_i = Call::a(Location().introduce(), ASTString("showDzn"), {aa_e});
               show_i->type(Type::parstring());
               FunctionI* fi = e.model->matchFn(e, show_i, false);
               assert(fi);
@@ -1831,7 +1851,11 @@ void create_output(EnvI& e, FlatteningOptions::OutputMode outputMode, bool outpu
                   Expression::addAnnotation(vd_followed->flat(), env.constants.ann.output_var);
                   check_rename_var(env, vd_followed, {}, 0);
                 } else {
-                  bool needOutputAnn = true;
+                  // We need to create an output annotation for the FlatZinc decl,
+                  // but only if it is NOT an optional type (those can't be output),
+                  // and if none of the contents of its array literal (if present)
+                  // has a reverse mapper.
+                  bool needOutputAnn = !reallyFlat->type().isOpt();
                   if (auto* al = Expression::dynamicCast<ArrayLit>(reallyFlat->e())) {
                     for (unsigned int i = 0; i < al->size(); i++) {
                       if (Id* id = Expression::dynamicCast<Id>((*al)[i])) {
