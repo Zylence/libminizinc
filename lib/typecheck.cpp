@@ -2208,7 +2208,11 @@ public:
       tt = Type::tuple();
       tt.typeId(wrapper_t);
       Expression::type(wrapper, tt);
-      c->e(wrapper);
+      if (indexTuple != nullptr) {
+        indexTuple->set(indexTuple->size() - 1, wrapper);
+      } else {
+        c->e(wrapper);
+      }
       c_e = wrapper;
     }
 
@@ -3091,18 +3095,20 @@ public:
               _typeErrors.emplace_back(_env, loc, "Cannot infer type for declaration");
             }
           }
-          vd->ti()->type(vet);
-          vd->type(vet);
-          if (vdt.any()) {
-            if (vet.structBT()) {
-              vd->ti()->setStructDomain(_env, vet);
-            } else if (vet.dim() > 0) {
-              GCLock lock;
-              std::vector<TypeInst*> ranges(vet.dim());
-              for (int i = 0; i < vet.dim(); i++) {
-                ranges[i] = new TypeInst(Location().introduce(), Type::parint());
+          if (!vet.isunknown()) {
+            vd->ti()->type(vet);
+            vd->type(vet);
+            if (vdt.any()) {
+              if (vet.structBT()) {
+                vd->ti()->setStructDomain(_env, vet);
+              } else if (vet.dim() > 0) {
+                GCLock lock;
+                std::vector<TypeInst*> ranges(vet.dim());
+                for (int i = 0; i < vet.dim(); i++) {
+                  ranges[i] = new TypeInst(Location().introduce(), Type::parint());
+                }
+                vd->ti()->setRanges(ranges);
               }
-              vd->ti()->setRanges(ranges);
             }
           }
         } else if (vet.isbot() && vet.dim() != 0 && vdt.dim() > 1 &&
