@@ -9,6 +9,10 @@ https://github.com/MiniZinc/libminizinc/issues.
 Upcoming Release
 ~~~~~~~~~~~~~~~~
 
+Changes:
+^^^^^^^^
+-  Automatically detect Gurobi 13.0 and potential future versions.
+
 Bug fixes:
 ^^^^^^^^^^
 -  Fix type checking for tuple and record literals to correctly reflect whether
