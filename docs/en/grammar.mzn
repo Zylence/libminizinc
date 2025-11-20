@@ -138,6 +138,7 @@
 
 <expr-atom-tail> ::= ε
                    | <array-access-tail> <expr-atom-tail>
+                   | <field-access-tail> <expr-atom-tail>
 
 % Numeric expressions
 <num-expr> ::= <num-expr-atom> <num-expr-binop-tail>
@@ -241,6 +242,9 @@
 
 % Array access
 <array-access-tail> ::= "[" <expr> "," ... "]"
+
+% Field access
+<field-access-tail> ::= "."<ident> | "."<int-literal>
 
 % Annotation literals
 <ann-literal> ::= <ident> [ "(" <expr> "," ... ")" ]

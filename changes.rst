@@ -12,6 +12,8 @@ Upcoming Release
 Changes:
 ^^^^^^^^
 -  Automatically detect Gurobi 13.0 and potential future versions.
+-  Enable projection of arrays of tuples and records using field access
+   notation (:bugref:`970`).
 
 Bug fixes:
 ^^^^^^^^^^

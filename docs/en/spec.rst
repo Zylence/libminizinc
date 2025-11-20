@@ -1354,7 +1354,7 @@ the :mzn:`not`) and so the annotation binds to the whole application.
 
 Expressions can be contained within parentheses.
 
-The array access operations
+The array and field access operations
 all bind more tightly than unary and binary operators and annotations.  
 They are described in more detail in :ref:`spec-Array-Access-Expressions`.
 
@@ -2087,6 +2087,47 @@ In addition to the :mzn:`..` operator, you can also use the :mzn:`<..`, :mzn:`..
    array[_, _] of var int: x1 = x[A..<, <..];
    % x2 = x[B..C, 3..3]
    array[_, _] of var int: x2 = x[<..<, 2<..];
+
+Record and Tuple Field Access Expressions
++++++++++++++++++++++++++++++++++++++++++
+
+Fields of records and tuples are accessed using a dot after an expression:
+
+.. literalinclude:: grammar.mzn
+  :language: minizincdef
+  :start-after: % Field access
+  :end-before: %
+
+For example:
+
+.. code-block:: minizinc
+
+    record(int:a, string: n): r = (a: 3, n: "foo");
+    int: x = r.a;
+    string: y = r.n;
+
+    tuple(float, bool): t = (42.0, true);
+    float: f = t.1;
+    bool: b = t.2;
+
+The type-inst of the result is the type-inst of the field.
+
+Field access can be chained, for example:
+
+.. code-block:: minizinc
+
+    record(record(int:a, string:n): r1, bool: b): r2 = 
+        (r1: (a: 3, n: "foo"), b: true);
+    int: x = r2.r1.a;
+
+Field access syntax can be used to project fields from arrays of records or tuples. For example:
+
+.. code-block:: minizinc
+
+    array[1..3] of record(int:a, string:n): r_array = 
+        [ (a: 1, n: "one"), (a: 2, n: "two"), (a: 3, n: "three") ];
+    array[1..3] of int: a_array = r_array.a;
+    array[1..3] of string: n_array = r_array.n;
 
 Annotation Literals
 +++++++++++++++++++

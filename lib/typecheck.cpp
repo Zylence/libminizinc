@@ -1385,6 +1385,52 @@ KeepAlive add_coercion(EnvI& env, Model* m, Expression* e0, const Location& loc_
     }
   }
 
+  auto* fa = Expression::dynamicCast<FieldAccess>(e);
+  if (fa != nullptr && Expression::type(fa->v()).dim() > 0) {
+    // Turn field access x.c on an array a into a projection
+    // let { any: xx = x } in arrayXd(xx, [it.c | it in array1d(xx)])
+    auto* array_exp = fa->v();
+    Type txx = Expression::type(array_exp);
+    auto* ti_xx = new TypeInst(Location().introduce(), Type::mkAny(-1));
+    Expression* array_exp_coerced =
+        add_coercion(env, m, array_exp, Expression::loc(array_exp), txx)();
+    auto* vd_xx = new VarDecl(Location().introduce(), ti_xx, env.genId(), array_exp_coerced);
+    vd_xx->toplevel(false);
+
+    Type tyElem = Expression::type(array_exp).elemType(env);
+
+    auto* vd_it = new VarDecl(Location().introduce(),
+                              new TypeInst(Expression::loc(e).introduce(), tyElem), 3);
+    vd_it->toplevel(false);
+    Generator gen({vd_it}, vd_xx->id(), nullptr);
+    Generators gens;
+    gens.g = {gen};
+
+    auto* inner_fa = new FieldAccess(Expression::loc(e).introduce(), vd_it->id(), fa->field());
+    Type inner_fa_t(fa->type());
+    if (inner_fa_t.typeId() == 0) {
+      inner_fa_t.dim(0);
+    } else {
+      const auto& arrayEnum = env.getArrayEnum(inner_fa_t.typeId());
+      inner_fa_t.typeId(0);
+      inner_fa_t.dim(0);
+      inner_fa_t.typeId(arrayEnum[arrayEnum.size() - 1]);
+    }
+    inner_fa->type(inner_fa_t);
+    Expression* elem = add_coercion(env, m, inner_fa, Expression::loc(inner_fa), inner_fa_t)();
+    auto* comprehension = new Comprehension(Location().introduce(), elem, gens, true);
+    comprehension->type(Type::arrType(env, Type::partop(1), Expression::type(elem)));
+
+    auto* arrayXd = Call::a(Expression::loc(e).introduce(), env.constants.ids.arrayXd,
+                            {vd_xx->id(), comprehension});
+    arrayXd->type(Type::arrType(env, Expression::type(e), Expression::type(elem)));
+    arrayXd->decl(m->matchFn(env, arrayXd, false, true));
+
+    Let* let = new Let(Expression::loc(e).introduce(), {vd_xx}, arrayXd);
+    let->type(arrayXd->type());
+    e = let;
+  }
+
   if (Expression::isa<ArrayAccess>(e) && Expression::type(e).dim() > 0) {
     auto* aa = Expression::cast<ArrayAccess>(e);
     // Turn ArrayAccess into a slicing operation
@@ -2112,42 +2158,55 @@ public:
   }
   /// Visit field access
   void vFieldAccess(FieldAccess* fa) {
-    if (!Expression::type(fa->v()).istuple() && !Expression::type(fa->v()).isrecord()) {
+    Expression* fa_v = fa->v();
+    Type fa_v_t = Expression::type(fa_v);
+    std::vector<unsigned int> arrayEnumIds;
+    if (fa_v_t.dim() > 0) {
+      // This is a field access on an array (a projection operation).
+      // Extract the type of the contents of the array.
+      if (fa_v_t.typeId() == 0) {
+        std::ostringstream oss;
+        oss << "field access attempted on expression of type `" << fa_v_t.toString(_env) << "'";
+        throw TypeError(_env, Expression::loc(fa), oss.str());
+      }
+      arrayEnumIds = _env.getArrayEnum(fa_v_t.typeId());
+      auto tid = arrayEnumIds[arrayEnumIds.size() - 1];
+      fa_v_t.typeId(0);
+      fa_v_t.dim(0);
+      fa_v_t.typeId(tid);
+    }
+
+    if (!fa_v_t.istuple() && !fa_v_t.isrecord()) {
       std::ostringstream oss;
-      oss << "field access attempted on expression of type `"
-          << Expression::type(fa->v()).toString(_env) << "'";
+      oss << "field access attempted on expression of type `" << fa_v_t.toString(_env) << "'";
       throw TypeError(_env, Expression::loc(fa), oss.str());
     }
-    if (Expression::type(fa->v()).istuple()) {
+    Type new_fa_t;
+    if (fa_v_t.istuple()) {
       if (!Expression::isa<IntLit>(fa->field())) {
         throw TypeError(_env, Expression::loc(fa),
                         "field access of a tuple must use an integer literal");
       }
-      assert(Expression::type(fa->v()).typeId() != 0);
-      TupleType* tt = _env.getTupleType(Expression::type(fa->v()));
+      assert(fa_v_t.typeId() != 0);
+      TupleType* tt = _env.getTupleType(fa_v_t);
       if (tt->size() == 2 && (*tt)[1].isunknown() && !Expression::loc(fa).isIntroduced()) {
         std::ostringstream oss;
-        oss << "field access attempted on expression of type `"
-            << Expression::type(fa->v()).toString(_env) << "'";
+        oss << "field access attempted on expression of type `" << fa_v_t.toString(_env) << "'";
         throw TypeError(_env, Expression::loc(fa), oss.str());
       }
       IntVal i = IntLit::v(Expression::cast<IntLit>(fa->field()));
       if (!i.isFinite() || i < 1 || i.toInt() > tt->size()) {
         std::ostringstream oss;
         oss << "unable to access field " << i << " of an expression of type `"
-            << Expression::type(fa->v()).toString(_env) << "'. Its fields are between 1 and "
-            << tt->size() << ".";
+            << fa_v_t.toString(_env) << "'. Its fields are between 1 and " << tt->size() << ".";
         throw TypeError(_env, Expression::loc(fa), oss.str());
       }
-      Type ty((*tt)[static_cast<unsigned int>(i.toInt()) - 1]);
-      assert((!ty.cv()) || Expression::type(fa->v()).cv());
-      ty.cv(Expression::type(fa->v()).cv());
-      fa->type(ty);
+      new_fa_t = (*tt)[static_cast<unsigned int>(i.toInt()) - 1];
     } else {
       // Check if field exists
-      assert(Expression::type(fa->v()).isrecord());
+      assert(fa_v_t.isrecord());
       unsigned int loc;
-      RecordType* rt = _env.getRecordType(Expression::type(fa->v()));
+      RecordType* rt = _env.getRecordType(fa_v_t);
       if (!Expression::isa<Id>(fa->field())) {
         if (fa->type().bt() == Type::BT_UNKNOWN) {
           throw TypeError(_env, Expression::loc(fa),
@@ -2160,7 +2219,7 @@ public:
         auto find = rt->findField(name);
         if (!find.first) {
           std::ostringstream oss;
-          oss << "expression of type `" << Expression::type(fa->v()).toString(_env)
+          oss << "expression of type `" << fa_v_t.toString(_env)
               << "' does not have a field named `" << name << "'.";
           throw TypeError(_env, Expression::loc(fa), oss.str());
         }
@@ -2170,11 +2229,33 @@ public:
         fa->field(nf);
       }
       // Set overall expression type
-      Type ty((*rt)[loc]);
-      assert((!ty.cv()) || Expression::type(fa->v()).cv());
-      ty.cv(Expression::type(fa->v()).cv());
-      fa->type(ty);
+      new_fa_t = (*rt)[loc];
     }
+    assert((!new_fa_t.cv()) || fa_v_t.cv());
+    new_fa_t.cv(fa_v_t.cv());
+
+    if (!arrayEnumIds.empty()) {
+      // make array type, since this is a projection
+      auto dim = arrayEnumIds.size() - 1;
+      bool haveEnums = false;
+      for (unsigned int i = 0; i < dim; i++) {
+        if (arrayEnumIds[i] != 0) {
+          haveEnums = true;
+          break;
+        }
+      }
+      auto tid = new_fa_t.typeId();
+      new_fa_t.typeId(0);
+      new_fa_t.dim(static_cast<int>(dim));
+      if (haveEnums) {
+        arrayEnumIds[dim] = tid;
+        int newEnumId = _env.registerArrayEnum(arrayEnumIds);
+        new_fa_t.typeId(newEnumId);
+      } else {
+        new_fa_t.typeId(tid);
+      }
+    }
+    fa->type(new_fa_t);
   }
   /// Visit array comprehension
   void vComprehension(Comprehension* c) {
