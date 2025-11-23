@@ -1685,6 +1685,8 @@ generator :
 generator_eq :
       MZN_IDENTIFIER MZN_EQ expr
       { if ($3) $$=new Generator({$1},nullptr,$3); else $$=nullptr; free($1); }
+    | MZN_UNDERSCORE MZN_EQ expr
+      { if ($3) $$=new Generator({std::string()},nullptr,$3); else $$=nullptr; }
 
 id_list : id_list_head comma_or_none
 
