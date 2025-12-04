@@ -1418,7 +1418,7 @@ KeepAlive add_coercion(EnvI& env, Model* m, Expression* e0, const Location& loc_
     }
     inner_fa->type(inner_fa_t);
     Expression* elem = add_coercion(env, m, inner_fa, Expression::loc(inner_fa), inner_fa_t)();
-    auto* comprehension = new Comprehension(Location().introduce(), elem, gens, true);
+    auto* comprehension = new Comprehension(Location().introduce(), elem, gens, false);
     comprehension->type(Type::arrType(env, Type::partop(1), Expression::type(elem)));
 
     auto* arrayXd = Call::a(Expression::loc(e).introduce(), env.constants.ids.arrayXd,
