@@ -517,6 +517,8 @@ vardecl_item :
             yyerror(&@1, parm, "declarations with `any' type-inst require definition");
           }
           $$ = VarDeclI::a(@$,$1);
+        } else {
+          $$ = nullptr;
         }
       }
     | ti_expr_and_id MZN_EQ expr
@@ -524,6 +526,8 @@ vardecl_item :
         if ($1) {
           $1->e($3);
           $$ = VarDeclI::a(@$,$1);
+        } else {
+          $$ = nullptr;
         }
       }
     | MZN_ENUM MZN_IDENTIFIER annotations
@@ -531,8 +535,9 @@ vardecl_item :
         TypeInst* ti = new TypeInst(@$,Type::parsetint());
         ti->setIsEnum(true);
         VarDecl* vd = new VarDecl(@$,ti,$2);
-        if ($2 && $3)
-        Expression::addAnnotations(vd, *$3);
+        if ($2 && $3) {
+          Expression::addAnnotations(vd, *$3);
+        }
         free($2);
         $$ = VarDeclI::a(@$,vd);
       }
@@ -550,6 +555,8 @@ vardecl_item :
           }
           VarDecl* vd = new VarDecl(@$,ti,$2,e);
           $$ = VarDeclI::a(@$,vd);
+        } else {
+          $$ = nullptr;
         }
         free($2);
         delete $5;
@@ -562,8 +569,9 @@ vardecl_item :
         args.push_back(new ArrayLit(@$,*$6));
         Call* sl = Call::a(@$, Constants::constants().ids.anonEnumFromStrings, args);
         VarDecl* vd = new VarDecl(@$,ti,$2,sl);
-        if ($2 && $3)
-        Expression::addAnnotations(vd, *$3);
+        if ($2 && $3) {
+          Expression::addAnnotations(vd, *$3);
+        }
         free($2);
         delete $6;
         $$ = VarDeclI::a(@$,vd);
@@ -634,7 +642,11 @@ enum_id_list :
 
 assign_item :
       MZN_IDENTIFIER MZN_EQ expr
-      { $$ = new AssignI(@$,$1,$3);
+      { if ($3) {
+          $$ = new AssignI(@$,$1,$3);
+        } else {
+          $$ = nullptr;
+        }
         free($1);
       }
 
@@ -689,8 +701,12 @@ predicate_item :
       {
         ParserState* pp = static_cast<ParserState*>(parm);
         if ($3 && $4) $3->push_back($4);
-        if ($3) $$ = new FunctionI(@$,ASTString($2),new TypeInst(@$,
-                                   Type::varbool()),*$3,$6,pp->isSTDLib,$4 != nullptr);
+        if ($3) {
+          $$ = new FunctionI(@$,ASTString($2),new TypeInst(@$,
+                             Type::varbool()),*$3,$6,pp->isSTDLib,$4 != nullptr);
+        } else {
+          $$ = nullptr;
+        }
         if ($$ && $5) $$->cast<FunctionI>()->ann().add(*$5);
         free($2);
         delete $3;
@@ -700,8 +716,12 @@ predicate_item :
       {
         ParserState* pp = static_cast<ParserState*>(parm);
         if ($3 && $4) $3->push_back($4);
-        if ($3) $$ = new FunctionI(@$,ASTString($2),new TypeInst(@$,
-                                   Type::parbool()),*$3,$6,pp->isSTDLib,$4 != nullptr);
+        if ($3) {
+          $$ = new FunctionI(@$,ASTString($2),new TypeInst(@$,
+                             Type::parbool()),*$3,$6,pp->isSTDLib,$4 != nullptr);
+        } else {
+         $$ = nullptr;
+       }
         if ($$ && $5) $$->cast<FunctionI>()->ann().add(*$5);
         free($2);
         delete $3;
@@ -711,8 +731,11 @@ predicate_item :
       {
         ParserState* pp = static_cast<ParserState*>(parm);
         if ($4 && $5) $4->push_back($5);
-        if ($4) $$ = new FunctionI(@$,ASTString(std::string($2)+"⁻¹"),new TypeInst(@$,
-                                   Type::varbool()),*$4,$7,pp->isSTDLib,$5 != nullptr);
+        if ($4) { $$ = new FunctionI(@$,ASTString(std::string($2)+"⁻¹"),new TypeInst(@$,
+                                     Type::varbool()),*$4,$7,pp->isSTDLib,$5 != nullptr);
+        } else {
+          $$ = nullptr;
+        }
         if ($$ && $6) $$->cast<FunctionI>()->ann().add(*$6);
         free($2);
         delete $4;
@@ -722,8 +745,12 @@ predicate_item :
       {
         ParserState* pp = static_cast<ParserState*>(parm);
         if ($4 && $5) $4->push_back($5);
-        if ($4) $$ = new FunctionI(@$,ASTString(std::string($2)+"⁻¹"),new TypeInst(@$,
-                                   Type::parbool()),*$4,$7,pp->isSTDLib,$5 != nullptr);
+        if ($4) {
+          $$ = new FunctionI(@$,ASTString(std::string($2)+"⁻¹"),new TypeInst(@$,
+                             Type::parbool()),*$4,$7,pp->isSTDLib,$5 != nullptr);
+        } else {
+          $$ = nullptr;
+        }
         if ($$ && $6) $$->cast<FunctionI>()->ann().add(*$6);
         free($2);
         delete $4;
@@ -739,7 +766,11 @@ function_item :
           // This is an any type, not allowed without a right hand side
           yyerror(&@2, parm, "return type cannot have `any' type-inst without type-inst variable");
         }
-        if ($5) $$ = new FunctionI(@$,ASTString($4),$2,*$5,$8,pp->isSTDLib,$6 != nullptr);
+        if ($5)  {
+          $$ = new FunctionI(@$,ASTString($4),$2,*$5,$8,pp->isSTDLib,$6 != nullptr);
+        } else {
+          $$ = nullptr;
+        }
         if ($$ && $7) $$->cast<FunctionI>()->ann().add(*$7);
         free($4);
         delete $5;
@@ -753,7 +784,11 @@ function_item :
           yyerror(&@1, parm, "return type cannot have `any' type-inst without type-inst variable");
         }
         if ($5 && $7) $5->push_back($7);
-        if ($5) $$ = new FunctionI(@$,ASTString($3),$1,*$5,$9,pp->isSTDLib,$7 != nullptr);
+        if ($5) {
+          $$ = new FunctionI(@$,ASTString($3),$1,*$5,$9,pp->isSTDLib,$7 != nullptr);
+        } else {
+          $$ = nullptr;
+        }
         if ($$ && $8) $$->cast<FunctionI>()->ann().add(*$8);
         free($3);
         delete $5;
@@ -778,7 +813,11 @@ annotation_item :
       {
         ParserState* pp = static_cast<ParserState*>(parm);
         TypeInst* ti=new TypeInst(@1,Type::ann());
-        if ($3) $$ = new FunctionI(@$,ASTString($2),ti,*$3,$5,pp->isSTDLib);
+        if ($3) {
+          $$ = new FunctionI(@$,ASTString($2),ti,*$3,$5,pp->isSTDLib);
+        } else {
+          $$ = nullptr;
+        }
         delete $3;
       }
 
@@ -791,7 +830,10 @@ ann_param :
           auto* ti = new TypeInst(@$,Type::ann(1));
           $$ = new VarDecl(@$, ti, ident);
           $$->toplevel(false);
-        } }
+        } else {
+          $$ = nullptr;
+        }
+      }
 
 operation_item_tail :
       /*empty*/
@@ -844,7 +886,12 @@ ti_expr_and_id_or_anon :
       ti_expr_and_id
       { $$=$1; }
     | ti_expr
-      { if ($1) $$=new VarDecl(@$, $1, ""); }
+      { if ($1) {
+          $$=new VarDecl(@$, $1, "");
+        } else {
+          $$ = nullptr;
+        }
+      }
 
 ti_expr_and_id :
       ti_expr ':' MZN_IDENTIFIER annotations
@@ -852,6 +899,8 @@ ti_expr_and_id :
           Id* ident = new Id(@3, $3, nullptr);
           $$ = new VarDecl(@$, $1, ident);
           if ($4) Expression::ann($$).add(*$4);
+        } else {
+          $$ = nullptr;
         }
         free($3);
         delete $4;
@@ -1036,7 +1085,12 @@ base_ti_expr_tail :
         delete $3;
       }
     | set_expr
-        { if ($1) $$ = new TypeInst(@$,Type(),$1); }
+      { if ($1) {
+          $$ = new TypeInst(@$,Type(),$1);
+        } else {
+          $$ = nullptr;
+        }
+      }
     | MZN_TI_IDENTIFIER
       { $$ = new TypeInst(@$,Type::top(),
                          new TIId(@$, $1));
@@ -1044,8 +1098,8 @@ base_ti_expr_tail :
       }
     | MZN_TI_ENUM_IDENTIFIER
       { $$ = new TypeInst(@$,Type::parint(),
-          new TIId(@$, $1));
-          free($1);
+                          new TIId(@$, $1));
+        free($1);
       }
 
 array_access_expr_list : array_access_expr_list_head comma_or_none
@@ -1411,30 +1465,58 @@ expr_atom_head_nonstring :
       '(' expr ')'
       { $$=$2; }
     | '(' expr ')' access_tail
-      { if ($4) $$=createAccess(@$, $2, *$4); delete $4; }
+      { if ($4) {
+          $$=createAccess(@$, $2, *$4);
+        } else {
+          $$ = nullptr;
+        }
+        delete $4;
+      }
     | '(' expr ')' MZN_POW_MINUS1
       { $$=new BinOp(@$, $2, BOT_POW, IntLit::a(-1)); }
     | '(' expr ')' access_tail MZN_POW_MINUS1
-      { if ($4) $$=new BinOp(@$,createAccess(@$, $2, *$4), BOT_POW, IntLit::a(-1)); delete $4; }
+      { if ($4) {
+          $$=new BinOp(@$,createAccess(@$, $2, *$4), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
+        delete $4;
+      }
     | MZN_IDENTIFIER
       { $$=new Id(@$, $1, nullptr); free($1); }
     | MZN_IDENTIFIER access_tail
-      { if ($2) $$=createAccess(@$, new Id(@1,$1,nullptr), *$2);
+      { if ($2) {
+          $$=createAccess(@$, new Id(@1,$1,nullptr), *$2);
+        } else {
+          $$ = nullptr;
+        }
         free($1); delete $2; }
     | MZN_IDENTIFIER MZN_POW_MINUS1
       { $$=new BinOp(@$,new Id(@$, $1, nullptr), BOT_POW, IntLit::a(-1)); free($1); }
     | MZN_IDENTIFIER access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, new Id(@1,$1,nullptr), *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, new Id(@1,$1,nullptr), *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         free($1); delete $2; }
     | MZN_UNDERSCORE
       { $$=new AnonVar(@$); }
     | MZN_UNDERSCORE access_tail
-      { if ($2) $$=createAccess(@$, new AnonVar(@$), *$2);
+      { if ($2) {
+          $$=createAccess(@$, new AnonVar(@$), *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | MZN_UNDERSCORE MZN_POW_MINUS1
       { $$=new BinOp(@$,new AnonVar(@$), BOT_POW, IntLit::a(-1)); }
     | MZN_UNDERSCORE access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, new AnonVar(@$), *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, new AnonVar(@$), *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | MZN_UNDERSCORE '(' expr ')'
       { $$ = Call::a(@$, Constants::constants().ids.anon_enum_set, {$3}); }
@@ -1460,84 +1542,156 @@ expr_atom_head_nonstring :
       { $$=Constants::constants().absent; }
     | set_literal
     | set_literal access_tail
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | set_literal MZN_POW_MINUS1
       { $$ = new BinOp(@$,$1, BOT_POW, IntLit::a(-1)); }
     | set_literal access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | set_comp
     | set_comp access_tail
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | set_comp MZN_POW_MINUS1
       { $$ = new BinOp(@$,$1, BOT_POW, IntLit::a(-1)); }
     | set_comp access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | simple_array_literal
     | simple_array_literal access_tail
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | simple_array_literal MZN_POW_MINUS1
       { $$ = new BinOp(@$,$1, BOT_POW, IntLit::a(-1)); }
     | simple_array_literal access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | simple_array_literal_2d
     | simple_array_literal_2d access_tail
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | simple_array_literal_2d MZN_POW_MINUS1
       { $$ = new BinOp(@$,$1, BOT_POW, IntLit::a(-1)); }
     | simple_array_literal_2d access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | simple_array_comp
     | simple_array_comp access_tail
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | simple_array_comp MZN_POW_MINUS1
       { $$ = new BinOp(@$,$1, BOT_POW, IntLit::a(-1)); }
     | simple_array_comp access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | if_then_else_expr
     | if_then_else_expr access_tail
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | if_then_else_expr MZN_POW_MINUS1
       { $$ = new BinOp(@$,$1, BOT_POW, IntLit::a(-1)); }
     | if_then_else_expr access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | let_expr
     | call_expr
     | call_expr access_tail
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | call_expr MZN_POW_MINUS1
     | call_expr access_tail MZN_POW_MINUS1
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | tuple_literal
     | tuple_literal access_tail
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | tuple_literal MZN_POW_MINUS1
       { $$ = new BinOp(@$,$1, BOT_POW, IntLit::a(-1)); }
     | tuple_literal access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | record_literal
     | record_literal access_tail
-      { if ($2) $$=createAccess(@$, $1, *$2);
+      { if ($2) {
+          $$=createAccess(@$, $1, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
     | record_literal MZN_POW_MINUS1
       { $$ = new BinOp(@$,$1, BOT_POW, IntLit::a(-1)); }
     | record_literal access_tail MZN_POW_MINUS1
-      { if ($2) $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+      { if ($2) {
+          $$=new BinOp(@$,createAccess(@$, $1, *$2), BOT_POW, IntLit::a(-1));
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
 
 string_expr:
@@ -1552,6 +1706,8 @@ string_quote_rest:
       expr MZN_STRING_QUOTE_END
       { if ($1) {
           $$=new BinOp(@$, Call::a(@$, ASTString("format"), {$1}), BOT_PLUSPLUS, new StringLit(@$,$2));
+        } else {
+          $$ = nullptr;
         }
         free($2);
       }
@@ -1559,6 +1715,8 @@ string_quote_rest:
       { if ($1) {
           $$=new BinOp(@$, Call::a(@$, ASTString("format"), {$1}), BOT_PLUSPLUS,
                        new BinOp(@$, new StringLit(@$,$2), BOT_PLUSPLUS, $3));
+        } else {
+          $$ = nullptr;
         }
         free($2);
       }
@@ -1600,7 +1758,11 @@ set_literal :
       '{' '}'
       { $$ = new SetLit(@$, std::vector<Expression*>()); }
     | '{' expr_list '}'
-      { if ($2) $$ = new SetLit(@$, *$2);
+      { if ($2) {
+          $$ = new SetLit(@$, *$2);
+        } else {
+          $$ = nullptr;
+        }
         delete $2; }
 
 tuple_literal :
@@ -1645,13 +1807,23 @@ record_field:
 
 set_comp :
       '{' expr '|' comp_tail '}'
-      { if ($4) $$ = new Comprehension(@$, $2, *$4, true);
+      { if ($4) {
+          $$ = new Comprehension(@$, $2, *$4, true);
+        } else {
+          $$ = nullptr;
+        }
         delete $4;
       }
 
 comp_tail :
       generator_list
-      { if ($1) $$=new Generators; $$->g = *$1; delete $1; }
+      { if ($1) {
+          $$=new Generators; $$->g = *$1;
+        } else {
+          $$ = nullptr;
+        }
+        delete $1;
+      }
 
 generator_list : generator_list_head comma_or_none
 
@@ -1746,6 +1918,8 @@ simple_array_literal :
             }
           }
           delete $2;
+        } else {
+          $$ = nullptr;
         }
       }
 
@@ -1958,10 +2132,16 @@ simple_array_comp :
           t->type(ty);
           $$=new Comprehension(@$, t, *$6, false);
           delete $6;
+        } else {
+          $$ = nullptr;
         }
       }
     | MZN_LEFT_BRACKET expr '|' comp_tail MZN_RIGHT_BRACKET
-      { if ($4) $$=new Comprehension(@$, $2, *$4, false);
+      { if ($4) {
+          $$=new Comprehension(@$, $2, *$4, false);
+        } else {
+          $$ = nullptr;
+        }
         delete $4;
       }
 
@@ -1985,8 +2165,8 @@ comp_expr_list_head :
       { $$=$1;
         if ($$ && $3) {
           if ($$->first.size() > 1) {
-            yyerror(&@$,parm,"invalid array literal, mixing indexed and non-indexed values");
             $$ = nullptr;
+            yyerror(&@$,parm,"invalid array literal, mixing indexed and non-indexed values");
           } else {
             $$->second.push_back($3);
           }
@@ -1996,8 +2176,8 @@ comp_expr_list_head :
       { $$=$1;
         if ($$ && $3 && $5) {
           if ($$->first.size() != $$->second.size()) {
-            yyerror(&@$,parm,"invalid array literal, mixing indexed and non-indexed values");
             $$ = nullptr;
+            yyerror(&@$,parm,"invalid array literal, mixing indexed and non-indexed values");
           } else if (Expression::isa<ArrayLit>($3) && Expression::cast<ArrayLit>($3)->isTuple() && Expression::cast<ArrayLit>($3)->size() == 1) {
             $$->first.push_back((*Expression::cast<ArrayLit>($3))[0]);
             $$->second.push_back($5);
@@ -2166,6 +2346,8 @@ call_expr :
           if (!hadWhere) {
             $$=Call::a(@$, $1, args);
           }
+        } else {
+          $$ = nullptr;
         }
         free($1);
         delete $3;
@@ -2208,6 +2390,8 @@ call_expr :
               }
             }
           }
+        } else {
+          $$ = nullptr;
         }
         if (ids.size() != 0) {
           yyerror(&@3, parm, "illegal expression in generator call");
@@ -2240,6 +2424,8 @@ call_expr :
           if (!hadWhere) {
             $$=Call::a(@$, std::string($1)+"⁻¹", args);
           }
+        } else {
+          $$ = nullptr;
         }
         free($1);
         delete $4;
@@ -2282,6 +2468,8 @@ call_expr :
               }
             }
           }
+        } else {
+          $$ = nullptr;
         }
         if (ids.size() != 0) {
           yyerror(&@4, parm, "illegal expression in generator call");

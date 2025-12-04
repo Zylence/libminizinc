@@ -29,6 +29,8 @@ Bug fixes:
 -  Fix output of arrays with optional elements in cases where the array
    definition cannot be moved to the output model.
 -  Fix domain bounds when hoisting if-then-else expressions.
+-  Fix bugs in the parser where a syntax error could lead to a crash because
+   of incorrectly initialised memory.
 
 .. _v2.9.4:
 
