@@ -59,6 +59,10 @@ class ParserLocation;
 #include <locale.h>  // newlocale, freelocale
 #endif
 
+#ifdef __APPLE__
+#include <xlocale.h>  // locale_t
+#endif
+
 namespace MiniZinc {
 
 struct ParseWorkItem {
