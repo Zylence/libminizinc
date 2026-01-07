@@ -48,15 +48,15 @@ NLSol NLSol::parseSolution(istream& in) {
 
     // Check the dual: we ignore the first, read the second. If non zero, some lines are to be
     // skipped
-    (getline(in, buffer) && getline(in, buffer));
-    if (in.bad()) {
+    bool success = (getline(in, buffer) && getline(in, buffer));
+    if (!success || in.bad()) {
       return NLSol("Error reading the number of dual", NL_Solver_Status::PARSE_ERROR, {});
     }
     int nb_duals = stoi(buffer);
 
     // Check the primal: we ignore the first, read the second
-    getline(in, buffer) && getline(in, buffer);
-    if (in.bad()) {
+    success = getline(in, buffer) && getline(in, buffer);
+    if (!success || in.bad()) {
       return NLSol("Error reading the number of primal", NL_Solver_Status::PARSE_ERROR, {});
     }
     int nb_vars = stoi(buffer);
