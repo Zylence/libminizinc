@@ -514,7 +514,7 @@ std::string Type::toString(const EnvI& env) const {
       break;
     case BT_TUPLE: {
       if (typeId() == COMP_INDEX) {
-        oss << "tuple(???)";
+        oss << "tuple(\?\?\?)";
       } else {
         TupleType* tt = env.getTupleType(*this);
         if (tt->size() == 2 && (*tt)[1].isunknown()) {

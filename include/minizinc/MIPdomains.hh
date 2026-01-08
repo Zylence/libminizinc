@@ -48,7 +48,8 @@
   } while (0)
 
 //( c, e ) \
-//   do { if ( !(c) ) { std::ostringstream oss; oss << e; throw MIPD_Infeasibility_Exception(oss.str()); } } while (0)
+//   do { if ( !(c) ) { std::ostringstream oss; oss << e; throw
+//   MIPD_Infeasibility_Exception(oss.str()); } } while (0)
 
 namespace MiniZinc {
 
