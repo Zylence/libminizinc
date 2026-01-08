@@ -22,7 +22,7 @@
 namespace MiniZinc {
 
 GC*& GC::gc() {
-#if defined(HAS_DECLSPEC_THREAD)
+#ifdef HAS_DECLSPEC_THREAD
   __declspec(thread) static GC* gc = nullptr;
 #elif defined(HAS_ATTR_THREAD)
   static __thread GC* gc = nullptr;
@@ -62,7 +62,7 @@ public:
 /// Memory managed by the garbage collector
 class GC::Heap {
   friend class GC;
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
   static const char* _nodeid[Item::II_END + 1];
   std::map<int, GCStat> gc_stats;
 #endif
@@ -436,7 +436,7 @@ void* GC::alloc(size_t size) {
 }
 
 void GC::Heap::mark() {
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
   std::cerr << "================= mark =================: ";
   gc_stats.clear();
 #endif
@@ -444,12 +444,12 @@ void GC::Heap::mark() {
   for (KeepAlive* e = _roots; e != nullptr; e = e->next()) {
     if (((*e)() != nullptr) && (*e)()->_gcMark == 0U) {
       Expression::mark((*e)());
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
       gc_stats[(*e)()->_id].keepalive++;
 #endif
     }
   }
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
   std::cerr << "+";
 #endif
 
@@ -503,14 +503,14 @@ void GC::Heap::mark() {
     }
   }
 
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
   std::cerr << "+";
   std::cerr << "\n";
 #endif
 }
 
 void GC::Heap::sweep() {
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
   std::cerr << "=============== GC sweep =============\n";
 #endif
   HeapPage* p = _page;
@@ -533,7 +533,7 @@ void GC::Heap::sweep() {
       auto* n = reinterpret_cast<ASTNode*>(p->data + off);
       size_t ns = nodesize(n);
       assert(ns != 0);
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
       GCStat& stats = gc_stats[n->_id];
       stats.first++;
       stats.total += ns;
@@ -570,7 +570,7 @@ void GC::Heap::sweep() {
           assert(p->used == p->size);
         }
       } else {
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
         stats.second++;
 #endif
         wholepage = false;
@@ -611,7 +611,7 @@ void GC::Heap::sweep() {
         new (fln) FreeListNode(ni.ns, _fl[freelistSlot(ni.ns)]);
         _fl[freelistSlot(ni.ns)] = fln;
         _freeMem += ni.ns;
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
         gc_stats[fln->_id].second++;
 #endif
       }
@@ -629,7 +629,7 @@ void GC::Heap::sweep() {
 #endif
     ::free(pf);
   }
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
   for (auto stat : gc_stats) {
     std::cerr << _nodeid[stat.first] << ":\t" << stat.second.first << " / " << stat.second.second
               << " / " << stat.second.keepalive << " / " << stat.second.inmodel << " / ";
@@ -685,7 +685,7 @@ size_t GC::maxMem() {
   return gc->_heap->_maxAllocedMem;
 }
 
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
 std::map<int, GCStat>& GC::stats() {
   GC* gc = GC::gc();
   return gc->_heap->gc_stats;

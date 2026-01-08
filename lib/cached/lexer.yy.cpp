@@ -1,4 +1,4 @@
-#line 18 "/Users/guidot/Programming/MiniZinc/libmzn/lib/lexer.lxx"
+#line 18 "/Users/dekker1/Code/github.com/minizinc/libminizinc/lib/lexer.lxx"
 #include <cstdint>
 
 
@@ -1376,7 +1376,7 @@ namespace MiniZinc {
   }
 
 namespace MiniZinc {
-  
+
   bool hexstrtointval(const char* s, long long int& v) {
     std::istringstream iss(s);
     iss >> std::hex >> v;
@@ -1405,7 +1405,7 @@ namespace MiniZinc {
   bool strtofloatval(void* parm, const char* s, double& val) {
     MiniZinc::ParserState* pp =
       static_cast<MiniZinc::ParserState*>(parm);
-#if defined(_WIN32)
+#ifdef _WIN32
     _locale_t c_loc = pp->cLocale;
     if (!c_loc) return false;
     errno = 0;
@@ -2617,7 +2617,7 @@ YY_RULE_SETUP
 case 155:
 YY_RULE_SETUP
 {
-                    MiniZinc::ParserState* parm = 
+                    MiniZinc::ParserState* parm =
                     static_cast<MiniZinc::ParserState*>(yyget_extra(yyscanner));
                     if (parm->isFlatZinc) {
                       return QUOTED_IDENTIFIER;
@@ -2802,7 +2802,7 @@ case 192:
 YY_RULE_SETUP
 {
                     yylval->sValue = strdup(yytext+1);
-                    yylval->sValue[strlen(yytext)-2] = 0; 
+                    yylval->sValue[strlen(yytext)-2] = 0;
                     return MZN_QUOTED_IDENTIFIER; }
 	YY_BREAK
 case 193:

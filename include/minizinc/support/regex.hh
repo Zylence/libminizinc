@@ -27,7 +27,7 @@
 
 // This is a workaround for a bug in flex that only shows up
 // with the Microsoft C++ compiler
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #define YY_NO_UNISTD_H
 #ifdef __cplusplus
 extern "C" int isatty(int);
@@ -36,7 +36,7 @@ extern "C" int isatty(int);
 
 // The Microsoft C++ compiler marks certain functions as deprecated,
 // so let's take the alternative definitions
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #define strdup _strdup
 #define fileno _fileno
 #endif

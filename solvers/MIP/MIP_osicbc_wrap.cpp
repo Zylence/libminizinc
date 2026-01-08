@@ -366,7 +366,7 @@ static CoinSighandler_t saveSignal = static_cast<CoinSighandler_t>(nullptr);
 
 extern "C" {
 void
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
     __cdecl
 #endif  // _MSC_VER
     signal_handler(int /*whichSignal*/) {

@@ -13,7 +13,7 @@
 
 // This is a workaround for a bug in flex that only shows up
 // with the Microsoft C++ compiler
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #define YY_NO_UNISTD_H
 #ifdef __cplusplus
 extern "C" int isatty(int);
@@ -22,12 +22,12 @@ extern "C" int isatty(int);
 
 // The Microsoft C++ compiler marks certain functions as deprecated,
 // so let's take the alternative definitions
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #define strdup _strdup
 #define fileno _fileno
 #endif
 
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #pragma warning(disable : 4065)
 #endif
 
@@ -53,7 +53,7 @@ class ParserLocation;
 #include <utility>
 #include <vector>
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #include <locale.h>  // _create_locale, _free_locale
 #else
 #include <locale.h>  // newlocale, freelocale
@@ -102,7 +102,7 @@ public:
         parseDocComments(parseDocComments0),
         hadError(false),
         err(err0) {
-#if defined(_WIN32)
+#ifdef _WIN32
     cLocale = _create_locale(LC_ALL, "C");
 #else
     cLocale = newlocale(LC_ALL_MASK, "C", nullptr);
@@ -111,7 +111,7 @@ public:
 
   ~ParserState() {
     if (cLocale != nullptr) {
-#if defined(_WIN32)
+#ifdef _WIN32
       _free_locale(cLocale);
 #else
       freelocale(cLocale);
@@ -144,7 +144,7 @@ public:
 
   std::string stringBuffer;
 
-#if defined(_WIN32)
+#ifdef _WIN32
   _locale_t cLocale;
 #else
   locale_t cLocale;

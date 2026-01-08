@@ -112,7 +112,7 @@ void dump_stack(const std::vector<EnvI::CallStackEntry>& stack) {
 
 }  // namespace
 
-#if defined(_WIN32)
+#ifdef _WIN32
 
 struct OverflowHandler::OverflowInfo {
   EnvI* env;
@@ -168,13 +168,13 @@ struct OverflowHandler::OverflowInfo {
   static void overflow(int sig, siginfo_t* info, void* context);
 };
 
-#if defined(__APPLE__)
+#ifdef __APPLE__
 
 #define MZN_CAN_HANDLE_OVERFLOW
 #define SEGV_ADDR reinterpret_cast<const char*>(info->si_addr)
 #define SIGFLAGS (SA_SIGINFO | SA_64REGSET)
 
-#if defined(__x86_64__)
+#ifdef __x86_64__
 #define SP_ADDR (const char*)((ucontext_t*)context)->uc_mcontext->__ss.__rsp
 #elif defined(__aarch64__)
 #define SP_ADDR (const char*)((ucontext_t*)context)->uc_mcontext->__ss.__sp
@@ -209,7 +209,7 @@ struct OverflowHandler::OverflowInfo {
 
 #endif
 
-#if defined(MZN_CAN_HANDLE_OVERFLOW)
+#ifdef MZN_CAN_HANDLE_OVERFLOW
 
 void OverflowHandler::OverflowInfo::overflow(int sig, siginfo_t* info, void* context) {
   ucontext_t ctx;
