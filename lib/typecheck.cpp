@@ -2287,6 +2287,7 @@ public:
       auto* wrapper = ArrayLit::constructTuple(Expression::loc(c_e).introduce(), {c_e});
       auto wrapper_t = _env.registerTupleType({tt, Type()});
       tt = Type::tuple();
+      tt.ti(Expression::type(c_e).ti());
       tt.typeId(wrapper_t);
       Expression::type(wrapper, tt);
       if (indexTuple != nullptr) {

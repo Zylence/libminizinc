@@ -31,6 +31,8 @@ Bug fixes:
 -  Fix domain bounds when hoisting if-then-else expressions.
 -  Fix bugs in the parser where a syntax error could lead to a crash because
    of incorrectly initialised memory.
+-  Fix a bug in type checking of arrays of arrays that could result in crashes
+   (:bugref:`980`).
 
 .. _v2.9.4:
 
