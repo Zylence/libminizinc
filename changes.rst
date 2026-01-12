@@ -34,6 +34,8 @@ Bug fixes:
 -  Fix a bug in type checking of arrays of arrays that could result in crashes
    (:bugref:`980`).
 -  Fix type checking of varified type aliases (:bugref:`983`).
+-  Fix a flattening bug that introduced integer constants into float expressions,
+   potentially leading to crashes (:bugref:`984`).
 
 .. _v2.9.4:
 

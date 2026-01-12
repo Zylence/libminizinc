@@ -3284,12 +3284,17 @@ KeepAlive bind(EnvI& env, Ctx ctx, VarDecl* vd, Expression* e) {
           Call* nc;
           std::vector<Expression*> args;
           if (c->id() == env.constants.ids.lin_exp) {
+            auto isInt = c->type().isint();
+            Expression* zero = isInt ? static_cast<Expression*>(IntLit::a(0))
+                                     : static_cast<Expression*>(FloatLit::a(0));
+            Expression* minusOne = isInt ? static_cast<Expression*>(IntLit::a(-1))
+                                         : static_cast<Expression*>(FloatLit::a(-1));
             auto* le_c = Expression::cast<ArrayLit>(follow_id(c->arg(0)));
             std::vector<Expression*> ncoeff(le_c->size());
             for (auto i = static_cast<unsigned int>(ncoeff.size()); (i--) != 0U;) {
               ncoeff[i] = (*le_c)[i];
             }
-            ncoeff.push_back(IntLit::a(-1));
+            ncoeff.push_back(minusOne);
             args.push_back(new ArrayLit(Location().introduce(), ncoeff));
             Expression::type(args[0], le_c->type());
             auto* le_x = Expression::cast<ArrayLit>(follow_id(c->arg(1)));
@@ -3309,7 +3314,7 @@ KeepAlive bind(EnvI& env, Ctx ctx, VarDecl* vd, Expression* e) {
               throw InternalError(ss.str());
             }
             nc->type(nc->decl()->rtype(env, args, nullptr, false));
-            auto* bop = new BinOp(Expression::loc(nc), nc, BOT_EQ, IntLit::a(0));
+            auto* bop = new BinOp(Expression::loc(nc), nc, BOT_EQ, zero);
             bop->type(Type::varbool());
             flat_exp(env, Ctx(), bop, env.constants.varTrue, env.constants.varTrue);
             return vd->id();
