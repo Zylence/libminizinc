@@ -36,6 +36,8 @@ Bug fixes:
 -  Fix type checking of varified type aliases (:bugref:`983`).
 -  Fix a flattening bug that introduced integer constants into float expressions,
    potentially leading to crashes (:bugref:`984`).
+-  Fix crash when emitting solutions with empty sets for the 
+  ``gecode_presolver`` solver interface (:bugref:`988`).
 
 .. _v2.9.4:
 

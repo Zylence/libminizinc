@@ -1253,7 +1253,10 @@ Expression* GecodeSolverInstance::getSolutionValue(Id* id) {
       SetVar& sv = var.setVar(solution);
       assert(sv.assigned());
       SetVarGlbRanges svr(sv);
-      assert(svr());
+      if (!svr()) {
+        // Set is empty
+        return new SetLit(Location().introduce(), IntSetVal::a());
+      }
 
       IntVal mi = svr.min();
       IntVal ma = svr.max();
