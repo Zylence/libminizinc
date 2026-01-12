@@ -29,7 +29,9 @@ predicate regular(
       );
     any: qq0 = enum2int(q0) - q_off;
     any: FF = {enum2int(i) - q_off | i in F};
-  } in fzn_regular_set(index2int(enum2int(x)), card(State), Val, dd, qq0, FF);
+  } in
+  if min(Val) = 1 then fzn_regular(index2int(enum2int(x)), card(State), max(Val), dd, qq0, FF)
+  else fzn_regular_set(index2int(enum2int(x)), card(State), Val, dd, qq0, FF) endif;
 
 /** @group globals.extensional
   The sequence of values in array \a x (which must all be in the range 1..\a S)
@@ -101,4 +103,5 @@ predicate regular(
       "regular: start state 'q0' not in 1..Q",
     ) /\
     assert(F subset 1..Q, "regular: final states in 'F' contain states outside 1..Q") /\
-    fzn_regular_set(x, Q, S, d, q0, F);
+    if min(S) = 1 then fzn_regular(x, Q, max(S), d, q0, F)
+    else fzn_regular_set(x, Q, S, d, q0, F) endif;

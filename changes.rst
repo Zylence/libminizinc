@@ -15,6 +15,9 @@ Changes:
 -  Enable projection of arrays of tuples and records using field access
    notation (:bugref:`970`).
 -  Enable anonymous assignment generators in comprehensions.
+-  Rewrite ``regular`` to ``fzn_regular`` instead of ``fzn_regular_set``
+   when possible, in order to improve performance for solvers that do not
+   support ``fzn_regular_set`` natively (:bugref:`981`).
 
 Bug fixes:
 ^^^^^^^^^^
