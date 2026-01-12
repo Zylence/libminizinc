@@ -33,6 +33,7 @@ Bug fixes:
    of incorrectly initialised memory.
 -  Fix a bug in type checking of arrays of arrays that could result in crashes
    (:bugref:`980`).
+-  Fix type checking of varified type aliases (:bugref:`983`).
 
 .. _v2.9.4:
 

@@ -101,9 +101,6 @@ void Type::mkVar(EnvI& env) {
     }
     return;
   }
-  if (ti() == TI_VAR) {
-    return;
-  }
   std::vector<unsigned int> arrayEnumIds;
   unsigned int tId = typeId();
   if (dim() != 0) {
@@ -207,7 +204,7 @@ void Type::mkPresent(EnvI& env) {
 bool Type::isVarifiable(const EnvI& env) const {
   return !contains(env, [](Type t) {
     return t.dim() != 0 || t.bt() == BT_STRING || t.bt() == BT_ANN ||
-           t.st() == ST_SET && (t.isOpt() || t.bt() != BT_INT && t.bt() != BT_BOT);
+           (t.st() == ST_SET && (t.isOpt() || (t.bt() != BT_INT && t.bt() != BT_BOT)));
   });
 }
 

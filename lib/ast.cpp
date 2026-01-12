@@ -1329,7 +1329,7 @@ bool TypeInst::resolveAlias(EnvI& env) {
     isArrayOfArray = true;
   }
 
-  if (type().tiExplicit() && ntype.ti() != type().ti()) {
+  if (type().tiExplicit()) {
     if (type().ti() == Type::TI_VAR) {
       ntype.mkVar(env);
     } else {
