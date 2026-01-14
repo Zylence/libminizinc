@@ -3836,6 +3836,12 @@ IntVal b_increment_counter(EnvI& env, Call* call) {
   return IntVal(value);
 }
 
+Expression* b_enum2int(EnvI& env, Call* call) {
+  // enum2int/index2int are no-ops
+  assert(call->argCount() == 1);
+  return call->arg(0);
+}
+
 void register_builtins(Env& e) {
   EnvI& env = e.envi();
   Model* m = env.model;
@@ -4861,6 +4867,43 @@ void register_builtins(Env& e) {
     std::vector<Type> t(1);
     t[0] = Type::parstring();
     rb(env, m, ASTString("mzn_increment_counter"), t, b_increment_counter);
+  }
+  {
+    std::vector<Type> t(1);
+    t[0] = Type::parint();
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0].ot(Type::OT_OPTIONAL);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0] = Type::parsetint();
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0].ot(Type::OT_OPTIONAL);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0] = Type::parint(-1);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0].ot(Type::OT_OPTIONAL);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0] = Type::parsetint(-1);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0].ot(Type::OT_OPTIONAL);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+
+    t[0] = Type::varint();
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0].ot(Type::OT_OPTIONAL);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0] = Type::varsetint();
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0] = Type::varint(-1);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0].ot(Type::OT_OPTIONAL);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+    t[0] = Type::varsetint(-1);
+    rb(env, m, env.constants.ids.enum2int, t, b_enum2int);
+
+    for (int i = 1; i <= 6; i++) {
+      t[0] = Type::optvartop(i);
+      rb(env, m, env.constants.ids.index2int, t, b_enum2int);
+    }
   }
 }
 

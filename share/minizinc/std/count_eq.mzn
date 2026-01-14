@@ -19,7 +19,7 @@ predicate count_eq(array [$X] of var opt $$E: x, var $$E: y, var int: c) =
       assert(
         has_bounds(y),
         "Unable to decompose count_eq without bounds for the y argument",
-        if 0 in dom(enum2int(y)) then lb(enum2int(y)) - 1 else 0 endif,
+        if 0 in dom(enum2int(y)) then enum2int(lb(y)) - 1 else 0 endif,
       );
   } in count_eq([i default to_enum_internal(enum_of(y), def) | i in x], y, c);
 

@@ -1432,11 +1432,7 @@ KeepAlive add_coercion(EnvI& env, Model* m, Expression* e0, const Location& loc_
   }
   if (Expression::isa<Call>(e)) {
     auto* c = Expression::cast<Call>(e);
-    if (c->id() == env.constants.ids.enum2int || c->id() == env.constants.ids.index2int) {
-      // Remove call to enum2int/index2int
-      assert(c->argCount() == 1);
-      e = c->arg(0);
-    } else if (c->id() == env.constants.ids.to_enum_internal) {
+    if (c->id() == env.constants.ids.to_enum_internal) {
       // Remove call to to_enum_internal
       assert(c->argCount() == 2);
       e = c->arg(1);
@@ -2335,17 +2331,12 @@ public:
       indexTuple = nullptr;
     }
     if (indexTuple == nullptr) {
-      if (Expression::isa<Call>(c_e)) {
-        // Ensure enum2int and similar get removed if necessary
-        c->e(add_coercion(_env, _model, c_e, c, Expression::type(c_e))());
-      }
+      c_e = add_coercion(_env, _model, c_e, c, Expression::type(c_e))();
+      c->e(c_e);
     } else {
       for (unsigned int i = 0; i < indexTuple->size(); i++) {
         auto* elem = (*indexTuple)[i];
-        if (Expression::isa<Call>(elem)) {
-          // Ensure enum2int and similar get removed if necessary
-          indexTuple->set(i, add_coercion(_env, _model, elem, c, Expression::type(elem))());
-        }
+        indexTuple->set(i, add_coercion(_env, _model, elem, c, Expression::type(elem))());
       }
       c_e = (*indexTuple)[indexTuple->size() - 1];
     }
@@ -3076,12 +3067,7 @@ public:
         }
         Type t_before = Expression::type(c_e);
         Type t = fi->argtype(_env, args, i).elemType(_env);
-        // Call to enum2int would have been removed when processing the comprehension,
-        // so don't warn here
-        bool warnImplicitEnum2Int = _env.warnImplicitEnum2Int;
-        _env.warnImplicitEnum2Int = false;
         c_e = add_coercion(_env, _model, c_e, c, t)();
-        _env.warnImplicitEnum2Int = warnImplicitEnum2Int;
         Type t_after = Expression::type(c_e);
         if (t_before != t_after) {
           if (indexTuple != nullptr) {

@@ -50,6 +50,8 @@ Bug fixes:
    or records.
 -  Fix type checking of functions that return arrays with generic index sets
    and enum element types.
+-  Fix false-positive enum compatibility type errors when using ``enum2int``
+   in arguments to generic functions.
 
 .. _v2.9.4:
 
