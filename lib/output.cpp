@@ -170,6 +170,20 @@ bool cannot_use_rhs_for_output(EnvI& env, Expression* e,
               rt.mkPar(env);
               decl->ti()->type(rt);
 
+              class MakeBodyPar : public EVisitor {
+              public:
+                EnvI& env;
+                MakeBodyPar(EnvI& env0) : env(env0) {}
+                bool enter(Expression* e) {
+                  Type t(Expression::type(e));
+                  t.mkPar(env);
+                  t.cv(false);
+                  Expression::type(e, t);
+                  return true;
+                }
+              } _mbp(env);
+              top_down(_mbp, decl->e());
+
               CollectOccurrencesE ce(env, env.outputVarOccurrences, decl);
               top_down(ce, decl->e());
               top_down(ce, decl->ti());

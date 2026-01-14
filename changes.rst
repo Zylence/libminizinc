@@ -41,6 +41,8 @@ Bug fixes:
    potentially leading to crashes (:bugref:`984`).
 -  Fix crash when emitting solutions with empty sets for the 
   ``gecode_presolver`` solver interface (:bugref:`988`).
+-  Fix a bug in the flattening of output expressions that could result in
+   the output model being invalid (:bugref:`975`).
 
 .. _v2.9.4:
 
