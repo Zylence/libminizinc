@@ -330,6 +330,32 @@ function array [$$E] of any $T: reverse(array [$$E] of any $T: x) =
     } in array1d(index_set(x), [xx[l - i] | i in index_set(xx)])
   endif;
 
+/** @group stdlib.builtins.array Pair elements of arrays \a x and \a y into tuples.
+
+  The arrays must have the same index set; the result has the same index set.
+*/
+function array [$$E] of tuple(any $T, any $U): zip(
+  array [$$E] of any $T: x,
+  array [$$E] of any $U: y,
+) =
+  assert(
+    index_sets_agree(x, y),
+    "Index sets must match",
+    [i: (x[i], y[i]) | i in index_set(x)],
+  );
+
+/** @group stdlib.builtins.array Split array \a x of pairs into a pair of arrays.
+
+  The resulting arrays keep the index set of \a x.
+*/
+function tuple(array [$$E] of any $T, array [$$E] of any $U): unzip(
+  array [$$E] of tuple($T, $U): x,
+) =
+  (
+    [i: x[i].1 | i in index_set(x)],
+    [i: x[i].2 | i in index_set(x)],
+  );
+
 /** @group stdlib.builtins.array Test if \a x and \a y have the same index sets */
 test index_sets_agree(array [$T] of any $U: x, array [$T] of any $W: y);
 
