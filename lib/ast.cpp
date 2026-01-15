@@ -1654,14 +1654,20 @@ Type type_from_tmap(EnvI& env, TypeInst* ti, const ASTStringMap<std::pair<Type, 
       }
     }
     std::vector<Type> fields(al->size() + (isArrayOfArray ? 1U : 0U));
+    bool isVar = false;
     for (unsigned int i = 0; i < al->size(); i++) {
       fields[i] = type_from_tmap(env, Expression::cast<TypeInst>((*al)[i]), tmap);
       ret.cv(ret.cv() || fields[i].cv());
+      isVar |= fields[i].isvar();
     }
     if (isArrayOfArray) {
       fields[al->size()] = Type();
     }
-    unsigned int typeId = 0;
+    unsigned int typeId = ret.typeId();
+    ret.typeId(0);
+    ret.ti(isVar ? Type::TI_VAR : Type::TI_PAR);
+    ret.typeId(typeId);
+    typeId = 0;
     if (ret.bt() == Type::BT_TUPLE) {
       typeId = env.registerTupleType(fields);
     } else {

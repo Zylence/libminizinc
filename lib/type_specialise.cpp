@@ -431,18 +431,20 @@ public:
   }
 
   static void updateReturnTypeInst(EnvI& env, ASTStringMap<Type>& ti_map, TypeInst* ti) {
-    if (ti->type().bt() == Type::BT_TUPLE) {
+    if (ti->type().structBT()) {
       auto* al = Expression::cast<ArrayLit>(ti->domain());
       auto* st = env.getStructType(ti->type());
+      bool isVar = false;
       for (unsigned int i = 0; i < st->size(); i++) {
         updateReturnTypeInst(env, ti_map, Expression::cast<TypeInst>((*al)[i]));
+        isVar |= Expression::type((*al)[i]).isvar();
       }
-    } else if (ti->type().bt() == Type::BT_RECORD) {
-      auto* al = Expression::cast<ArrayLit>(ti->domain());
-      auto* st = env.getStructType(ti->type());
-      for (unsigned int i = 0; i < st->size(); i++) {
-        updateReturnTypeInst(env, ti_map, Expression::cast<TypeInst>((*al)[i]));
-      }
+      auto ti_t = ti->type();
+      auto ti_tid = ti_t.typeId();
+      ti_t.typeId(0);
+      ti_t.ti(isVar ? Type::TI_VAR : Type::TI_PAR);
+      ti_t.typeId(ti_tid);
+      ti->type(ti_t);
     } else if (TIId* tiid = Expression::dynamicCast<TIId>(ti->domain())) {
       Type ret_type = ti_map.find(tiid->v())->second;
       if (ret_type.dim() != 0 && ti->type().dim() == 0) {

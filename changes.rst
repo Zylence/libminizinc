@@ -43,6 +43,8 @@ Bug fixes:
   ``gecode_presolver`` solver interface (:bugref:`988`).
 -  Fix a bug in the flattening of output expressions that could result in
    the output model being invalid (:bugref:`975`).
+-  Fix type checking of return types of generic functions that return tuples
+   or records.
 
 .. _v2.9.4:
 
