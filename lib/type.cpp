@@ -485,7 +485,7 @@ std::string Type::toString(const EnvI& env) const {
   switch (static_cast<BaseType>(_bt)) {
     case BT_INT: {
       unsigned int enumId;
-      if (_typeId != 0U && dim() > 0) {
+      if (_typeId != 0U && dim() != 0) {
         const std::vector<unsigned int>& arrayEnumIds = env.getArrayEnum(_typeId);
         enumId = arrayEnumIds[arrayEnumIds.size() - 1];
       } else {

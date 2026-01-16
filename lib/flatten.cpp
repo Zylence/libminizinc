@@ -1610,7 +1610,12 @@ bool EnvI::isSubtype(const Type& t10, const Type& t2, bool strictEnums) const {
     if (t2.typeId() != 0) {
       const std::vector<unsigned int>& t1enumIds = getArrayEnum(t1.typeId());
       const std::vector<unsigned int>& t2enumIds = getArrayEnum(t2.typeId());
-      assert(t1enumIds.size() == t2enumIds.size());
+      if (t1enumIds.size() != t2enumIds.size()) {
+        if (t2.dim() == -1) {
+          return t1.isbot() || t1enumIds[t1enumIds.size() - 1] == t2enumIds[t2enumIds.size() - 1];
+        }
+        return false;
+      }
       for (unsigned int i = 0; i < t1enumIds.size() - 1; i++) {
         if (t2enumIds[i] != 0 && t1enumIds[i] != t2enumIds[i]) {
           return false;

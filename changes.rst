@@ -19,6 +19,7 @@ Changes:
    when possible, in order to improve performance for solvers that do not
    support ``fzn_regular_set`` natively (:bugref:`981`).
 -  Add ``zip`` and ``unzip`` functions to the standard library (:bugref:`967`).
+-  Add enum constructors lifted to arrays (:bugref:`965`).
 
 Bug fixes:
 ^^^^^^^^^^
@@ -46,6 +47,8 @@ Bug fixes:
    the output model being invalid (:bugref:`975`).
 -  Fix type checking of return types of generic functions that return tuples
    or records.
+-  Fix type checking of functions that return arrays with generic index sets
+   and enum element types.
 
 .. _v2.9.4:
 

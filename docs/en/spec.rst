@@ -2527,7 +2527,14 @@ Enum constructors can be used to map non-contiguous sets to (contiguous) enumera
 
     enum Person = { Amy, Bert, Celeste, Doug, Emely };
     enum Staff = S({Amy, Doug});
-    enum Customers = S(Person diff S⁻¹(Staff));
+    enum Customers = C(Person diff S⁻¹(Staff));
+
+An enum constructor and its inverse can be applied to sets and arrays of enum values as well:
+
+.. code-block:: minizinc
+
+    array[int] of Customers: custs = S([Bert])
+    array[int] of Person: custs_as_people = C⁻¹(custs);
 
 An enum can be declared but not defined, in which case it must be defined
 elsewhere within the model, or in a data file.

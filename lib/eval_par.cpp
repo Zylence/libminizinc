@@ -28,7 +28,8 @@
 
 namespace MiniZinc {
 
-void check_par_domain(EnvI& env, VarDecl* vd, Expression* rhs, bool isArg) {
+void check_par_domain(EnvI& env, VarDecl* vd, Expression* rhs, int argNumber,
+                      const std::string& callId) {
   struct ToCheck {
     Expression* accessor;
     Expression* e;
@@ -36,7 +37,7 @@ void check_par_domain(EnvI& env, VarDecl* vd, Expression* rhs, bool isArg) {
     ToCheck(Expression* _accessor, Expression* _e, TypeInst* _ti)
         : accessor(_accessor), e(_e), ti(_ti) {}
   };
-  bool hasName = !vd->id()->str().empty();
+  bool hasName = vd->id()->idn() == -1 && !vd->id()->str().empty();
   std::vector<ToCheck> todo({{hasName ? vd->id() : nullptr, rhs, vd->ti()}});
   GCLock lock;
 
@@ -110,7 +111,12 @@ void check_par_domain(EnvI& env, VarDecl* vd, Expression* rhs, bool isArg) {
         if (it.accessor != nullptr) {
           auto enumId = Expression::type(it.ti->domain()).typeId();
           std::ostringstream oss;
-          oss << (isArg ? "argument" : "parameter") << " value out of range: ";
+          if (argNumber >= 0) {
+            oss << "argument " << (argNumber + 1) << " of `" << callId << "'";
+          } else {
+            oss << "parameter";
+          }
+          oss << " out of range: ";
           oss << "declared domain of `" << *it.accessor << "' is " << env.show(isv, enumId) << ", ";
           oss << "but assigned value is " << env.show(v, enumId);
           throw ResultUndefinedError(env, Expression::loc(rhs), oss.str());
@@ -128,7 +134,12 @@ void check_par_domain(EnvI& env, VarDecl* vd, Expression* rhs, bool isArg) {
       if (!fsv->contains(v)) {
         if (it.accessor != nullptr) {
           std::ostringstream oss;
-          oss << (isArg ? "argument" : "parameter") << " value out of range: ";
+          if (argNumber >= 0) {
+            oss << "argument " << (argNumber + 1) << " of `" << callId << "'";
+          } else {
+            oss << "parameter";
+          }
+          oss << " value out of range: ";
           oss << "declared domain of `" << *it.accessor << "' is " << *fsv << ", ";
           oss << "but assigned value is " << v;
           throw ResultUndefinedError(env, Expression::loc(rhs), oss.str());
@@ -149,7 +160,12 @@ void check_par_domain(EnvI& env, VarDecl* vd, Expression* rhs, bool isArg) {
         if (it.accessor != nullptr) {
           auto enumId = Expression::type(it.ti->domain()).typeId();
           std::ostringstream oss;
-          oss << (isArg ? "argument" : "parameter") << " value out of range: ";
+          if (argNumber >= 0) {
+            oss << "argument " << (argNumber + 1) << " of `" << callId << "'";
+          } else {
+            oss << "parameter";
+          }
+          oss << " value out of range: ";
           oss << "declared domain of `" << *it.accessor << "' is " << env.show(isv, enumId) << ", ";
           oss << "but assigned value is " << env.show(rsv, enumId);
           throw ResultUndefinedError(env, Expression::loc(rhs), oss.str());
@@ -169,7 +185,12 @@ void check_par_domain(EnvI& env, VarDecl* vd, Expression* rhs, bool isArg) {
       if (!Ranges::subset(rr, fr)) {
         if (it.accessor != nullptr) {
           std::ostringstream oss;
-          oss << (isArg ? "argument" : "parameter") << " value out of range: ";
+          if (argNumber >= 0) {
+            oss << "argument " << (argNumber + 1) << " of `" << callId << "'";
+          } else {
+            oss << "parameter";
+          }
+          oss << " value out of range: ";
           oss << "declared domain of `" << *it.accessor << "' is " << *fsv << ", ";
           oss << "but assigned value is " << *rsv;
           throw ResultUndefinedError(env, Expression::loc(rhs), oss.str());
@@ -674,14 +695,14 @@ typename Eval::Val eval_call(EnvI& env, CallClass* ce) {
     params[i] = eval_par(env, ce->arg(i));
   }
   EvalCallCleanup<CallClass> ecc(env, ce);
-  for (unsigned int i = ce->decl()->paramCount(); i--;) {
+  for (unsigned int i = 0; i < ce->decl()->paramCount(); i++) {
     VarDecl* vd = ce->decl()->param(i);
     auto arg_idx = i;
     check_index_sets(env, vd, params[i], true);
     vd->flat(vd);
     vd->e(params[i]);
     if (Expression::type(vd->e()).isPar()) {
-      check_par_domain(env, vd, vd->e(), true);
+      check_par_domain(env, vd, vd->e(), i, demonomorphise_identifier(ce->decl()->id()));
     }
   }
   typename Eval::Val ret = Eval::e(env, ce->decl()->e());

@@ -1750,6 +1750,12 @@ Type type_from_tmap(EnvI& env, TypeInst* ti, const ASTStringMap<std::pair<Type, 
       }
       enumIds[enumIds.size() - 1] = curTypeId;
       ret.typeId(env.registerArrayEnum(enumIds));
+    } else if (ret.dim() > 0 && ret.typeId() != 0) {
+      std::vector<unsigned int> enumIds(it->second.first.dim() + 1, 0);
+      const auto& curIds = env.getArrayEnum(curTypeId);
+      curTypeId = curIds[curIds.size() - 1];
+      enumIds[enumIds.size() - 1] = curTypeId;
+      ret.typeId(env.registerArrayEnum(enumIds));
     }
   } else if (!ti->ranges().empty()) {
     std::vector<unsigned int> enumIds(ti->ranges().size() + 1);

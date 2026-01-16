@@ -506,6 +506,9 @@ void create_enum_mapper(EnvI& env, Model* m, unsigned int enumId, VarDecl* vd, M
              endif ::mzn_evaluate_once
          function opt X: C(opt E: x) = if occurs(x) then C(deopt(x)) else to_enum(x,<>) endif
          function set of X: C(set of E: x) = { C(i) | i in x }
+         function array[$Y] of X: C(array[$Y] of E: x) = arrayXd(x, [C(i) | i in x ])
+         function array[$Y] of opt X: C(array[$Y] of opt E: x) = arrayXd(x, [C(i) | i in x ])
+         function array[$Y] of set of X: C(array[$Y] of set of E: x) = arrayXd(x, [C(i) | i in x ])
          function set of X: C() = C(E);
 
          function E: C⁻¹(X: x) =
@@ -517,7 +520,10 @@ void create_enum_mapper(EnvI& env, Model* m, unsigned int enumId, VarDecl* vd, M
            endif ::mzn_evaluate_once
 
          function opt E: C⁻¹(opt X: x) = if occurs(x) then C⁻¹(deopt(x)) else to_enum(x,<>) endif
-         function set of E: C⁻¹(set of X: x) = { C⁻¹(i) | i in x }
+         function array[$Y] of E: C⁻¹(array[$Y] of X: x) = arrayXd(x, [C⁻¹(i) | i in x ])
+         function array[$Y] of opt E: C⁻¹(array[$Y] of opt X: x) = arrayXd(x, [C⁻¹(i) | i in x ])
+         function array[$Y] of set of E: C⁻¹(array[$Y] of set of X: x) = arrayXd(x, [C⁻¹(i) | i in x
+         ]) function set of E: C⁻¹(set of X: x) = { C⁻¹(i) | i in x }
          */
 
         {
@@ -616,6 +622,37 @@ void create_enum_mapper(EnvI& env, Model* m, unsigned int enumId, VarDecl* vd, M
             enumItems->addItem(Cfn);
           }
           {
+            for (unsigned int i = 0; i <= 2; i++) {
+              Type Xt(baseType);
+              Xt.dim(-1);
+              if (i == 1) {
+                Xt.ot(Type::OT_OPTIONAL);
+              } else if (i == 2) {
+                Xt.st(Type::ST_SET);
+              }
+              auto* range_tiid = new TIId(Location().introduce(), "X");
+              auto* Cfn_x_ti_r = new TypeInst(Location().introduce(), Type::top(), range_tiid);
+              ASTExprVec<TypeInst> ranges({Cfn_x_ti_r});
+              auto* Cfn_ti = new TypeInst(Location().introduce(), Xt, ranges, vd->id());
+              Type argT(Xt);
+              auto* Cfn_x_ti = new TypeInst(Location().introduce(), argT, ranges, constructorArgId);
+              auto* vd_x = new VarDecl(Location().introduce(), Cfn_x_ti, env.genId());
+              vd_x->toplevel(false);
+              auto* s_ti = new TypeInst(Location().introduce(), Type::parint());
+              auto* s = new VarDecl(Location().introduce(), s_ti, env.genId());
+              s->toplevel(false);
+              auto* inv = Call::a(Location().introduce(), c->id(), {s->id()});
+              Generator gen({s}, vd_x->id(), nullptr);
+              Generators gens;
+              gens.g = {gen};
+              auto* comprehension = new Comprehension(Location().introduce(), inv, gens, false);
+              auto* arrayXd = Call::a(Location().introduce(), env.constants.ids.arrayXd,
+                                      {vd_x->id(), comprehension});
+              auto* Cfn = new FunctionI(Location().introduce(), c->id(), Cfn_ti, {vd_x}, arrayXd);
+              enumItems->addItem(Cfn);
+            }
+          }
+          {
             Type rT;
             rT.ti(baseType.ti());
             rT.typeId(constructorArgId->type().typeId());
@@ -703,6 +740,38 @@ void create_enum_mapper(EnvI& env, Model* m, unsigned int enumId, VarDecl* vd, M
             auto* Cfn =
                 new FunctionI(Location().introduce(), Cinv_id, Cfn_ti, {vd_x}, comprehension);
             enumItems->addItem(Cfn);
+          }
+          {
+            for (unsigned int i = 0; i <= 2; i++) {
+              Type Xt(baseType);
+              Xt.dim(-1);
+              if (i == 1) {
+                Xt.ot(Type::OT_OPTIONAL);
+              } else if (i == 2) {
+                Xt.st(Type::ST_SET);
+              }
+              auto* range_tiid = new TIId(Location().introduce(), "X");
+              auto* Cfn_x_ti_r = new TypeInst(Location().introduce(), Type::top(), range_tiid);
+              ASTExprVec<TypeInst> ranges({Cfn_x_ti_r});
+              auto* Cfn_ti = new TypeInst(Location().introduce(), Xt, ranges, constructorArgId);
+              Type argT(Xt);
+              auto* Cfn_x_ti = new TypeInst(Location().introduce(), argT, ranges, vd->id());
+              auto* vd_x = new VarDecl(Location().introduce(), Cfn_x_ti, env.genId());
+              vd_x->toplevel(false);
+              ASTString Cinv_id(std::string(c->id().c_str()) + "⁻¹");
+              auto* s_ti = new TypeInst(Location().introduce(), Type::parint());
+              auto* s = new VarDecl(Location().introduce(), s_ti, env.genId());
+              s->toplevel(false);
+              auto* inv = Call::a(Location().introduce(), Cinv_id, {s->id()});
+              Generator gen({s}, vd_x->id(), nullptr);
+              Generators gens;
+              gens.g = {gen};
+              auto* comprehension = new Comprehension(Location().introduce(), inv, gens, false);
+              auto* arrayXd = Call::a(Location().introduce(), env.constants.ids.arrayXd,
+                                      {vd_x->id(), comprehension});
+              auto* Cfn = new FunctionI(Location().introduce(), Cinv_id, Cfn_ti, {vd_x}, arrayXd);
+              enumItems->addItem(Cfn);
+            }
           }
         }
 
