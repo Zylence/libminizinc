@@ -375,8 +375,8 @@ void GecodeSolverInstance::registerConstraints() {
   registerConstraint("table_int", GecodeConstraints::p_table_int);
   registerConstraint("table_bool", GecodeConstraints::p_table_bool);
   registerConstraint("cumulatives", GecodeConstraints::p_cumulatives);
-  registerConstraint("among_seq_int", GecodeConstraints::p_among_seq_int);
-  registerConstraint("among_seq_bool", GecodeConstraints::p_among_seq_bool);
+  registerConstraint("sliding_among_int", GecodeConstraints::p_sliding_among_int);
+  registerConstraint("sliding_among_bool", GecodeConstraints::p_sliding_among_bool);
 
   registerConstraint("bool_lin_eq", GecodeConstraints::p_bool_lin_eq);
   registerConstraint("bool_lin_ne", GecodeConstraints::p_bool_lin_ne);

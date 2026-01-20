@@ -126,22 +126,25 @@ predicate gecode_array_set_element_intersect_in(
   set of int: u,
 );
 
-predicate gecode_among_seq_int(array [int] of var int: x, set of int: S, int: l, int: m, int: n);
-
-predicate gecode_among_seq_bool(array [int] of var bool: x, bool: b, int: l, int: m, int: n);
-
 /** @group gecode.constraints
  Every subsequence of \a x of length \a l has at least \a m and at most \a n occurrences
- of the values in \a S
+ of the values in \a S.
+
+ Note this is an alias for the sliding_among constraint, kept here for backwards
+ compatibility only.
 */
 predicate among_seq(array [int] of var int: x, set of int: S, int: l, int: m, int: n) =
-  gecode_among_seq_int(x, S, l, m, n);
+  sliding_among(m, n, l, x, S);
+
 /** @group gecode.constraints
  Every subsequence of \a x of length \a l has at least \a m and at most \a n occurrences
  of the value \a b
+
+ Note this is an alias for the sliding_among constraint, kept here for backwards
+ compatibility only.
 */
 predicate among_seq(array [int] of var bool: x, bool: b, int: l, int: m, int: n) =
-  gecode_among_seq_bool(x, b, l, m, n);
+  sliding_among(m, n, l, x, b);
 
 predicate gecode_circuit_cost_array(
   array [int] of int: c,

@@ -137,6 +137,7 @@ include "roots.mzn";
 include "roots_fn.mzn";
 include "seq_precede_chain.mzn";
 include "sliding_sum.mzn";
+include "sliding_among.mzn";
 include "sort.mzn";
 include "sort_fn.mzn";
 include "span.mzn";

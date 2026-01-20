@@ -20,6 +20,7 @@ Changes:
    support ``fzn_regular_set`` natively (:bugref:`981`).
 -  Add ``zip`` and ``unzip`` functions to the standard library (:bugref:`967`).
 -  Add enum constructors lifted to arrays (:bugref:`965`).
+-  Add ``sliding_among`` constraint to the standard globals library (:bugref:`960`).
 
 Bug fixes:
 ^^^^^^^^^^
