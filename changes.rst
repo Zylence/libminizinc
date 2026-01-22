@@ -52,6 +52,8 @@ Bug fixes:
    and enum element types.
 -  Fix false-positive enum compatibility type errors when using ``enum2int``
    in arguments to generic functions.
+-  Improve performance of function matching by avoiding to copy functions
+   unnecessarily between models.
 
 .. _v2.9.4:
 

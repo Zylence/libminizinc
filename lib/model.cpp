@@ -668,7 +668,7 @@ FunctionI* Model::matchFn(EnvI& env, const ASTString& id, const std::vector<Type
 void Model::mergeStdLib(EnvI& env, Model* m) const {
   for (const auto& it : _fnmap) {
     for (const auto& cit : it.second) {
-      if (cit.fi->fromStdLib()) {
+      if (cit.fi->fromStdLib() && !cit.isPolymorphicVariant) {
         (void)m->registerFn(env, cit.fi);
       }
     }
@@ -973,6 +973,9 @@ FunctionI* Model::matchFn(EnvI& env, Call* c, bool strictEnums, bool throwIfNotF
     return nullptr;
   }
   const std::vector<FnEntry>& v = it->second;
+  if (v.size() == 1 && v[0].fi == c->decl()) {
+    return c->decl();
+  }
   std::vector<FunctionI*> matched;
   Expression* botarg = nullptr;
   for (const auto& i : v) {
