@@ -382,6 +382,96 @@ void JSONParser::expectEof(istream& is) {
   }
 }
 
+Expression* JSONParser::parseEnumDef(std::istream& is) {
+  // precondition: opening bracket has been read
+  vector<Expression*> constructors;
+  vector<Expression*> literals;
+  for (Token next = readToken(is); next.t != T_LIST_CLOSE; next = readToken(is)) {
+    switch (next.t) {
+      case T_COMMA:
+        break;
+      case T_STRING:
+        literals.push_back(new Id(Location().introduce(), next.s, nullptr));
+        break;
+      case T_OBJ_OPEN: {
+        if (!literals.empty()) {
+          constructors.push_back(new SetLit(Location().introduce(), literals));
+          literals.clear();
+        }
+        auto k = expectString(is);
+        expectToken(is, T_COLON);
+        constructors.push_back(parseEnumConstructorDef(is, k));
+        break;
+      }
+      default:
+        throw JSONError(_env, errLocation(), "invalid enum definition");
+    }
+  }
+  if (!literals.empty() || constructors.empty()) {
+    constructors.push_back(new SetLit(Location().introduce(), literals));
+  }
+  auto* arg = new ArrayLit(Location().introduce(), constructors);
+  return Call::a(Location().introduce(), _env.constants.ids.enumFromConstructors, {arg});
+}
+
+Expression* JSONParser::parseEnumConstructorDef(std::istream& is, const std::string& seen) {
+  // precondition: already parsed '{ "e" :' or '{ "c" :' or '{ "i":'
+  //               seen = "e" or "c" or "i"
+  auto key = seen;
+  Expression* e = nullptr;
+  std::string c;
+  Expression* i = nullptr;
+
+  for (;;) {
+    if (key == "e" && i == nullptr) {
+      e = parseExp(is);
+    } else if (key == "c" && i == nullptr) {
+      c = expectString(is);
+    } else if (key == "i" && c.empty()) {
+      i = parseExp(is);
+    } else {
+      throw JSONError(_env, errLocation(), "invalid enum constructor");
+    }
+
+    auto next = readToken(is);
+    switch (next.t) {
+      case T_COMMA:
+        key = expectString(is);
+        expectToken(is, T_COLON);
+        break;
+      case T_OBJ_CLOSE:
+        if (!c.empty()) {
+          if (e == nullptr || (!Expression::isa<SetLit>(e) && !Expression::isa<ArrayLit>(e) &&
+                               !Expression::isa<Id>(e))) {
+            throw JSONError(_env, errLocation(), "invalid enum constructor");
+          }
+          if (auto* al = Expression::dynamicCast<ArrayLit>(e)) {
+            e = new SetLit(Location().introduce(), al->getVec());
+          }
+          return Call::a(Location().introduce(), c, {e});
+        }
+        if (i != nullptr) {
+          if (!Expression::isa<SetLit>(i) && !Expression::isa<ArrayLit>(i)) {
+            throw JSONError(_env, errLocation(), "invalid anonymous enum constructor");
+          }
+          if (auto* al = Expression::dynamicCast<ArrayLit>(i)) {
+            i = new SetLit(Location().introduce(), al->getVec());
+          }
+          return Call::a(Location().introduce(), _env.constants.ids.anon_enum_set, {i});
+        }
+        if (e != nullptr && Expression::isa<StringLit>(e)) {
+          // TODO: Deprecate this syntax and require direct strings
+          return new SetLit(
+              Location().introduce(),
+              {new Id(Location().introduce(), Expression::cast<StringLit>(e)->v(), nullptr)});
+        }
+        throw JSONError(_env, errLocation(), "invalid enum constructor");
+      default:
+        throw JSONError(_env, errLocation(), "invalid enum constructor");
+    }
+  }
+}
+
 Expression* JSONParser::parseEnum(std::istream& is) {
   Token next = readToken(is);
   switch (next.t) {
@@ -729,6 +819,9 @@ Expression* JSONParser::parseExp(std::istream& is, bool parseObjects, TypeInst* 
     case T_OBJ_OPEN:
       return parseObjects ? parseObject(is, ti) : nullptr;
     case T_LIST_OPEN:
+      if (ti != nullptr && ti->isEnum()) {
+        return parseEnumDef(is);
+      }
       return parseArray(is, ti);
     default:
       throw JSONError(_env, errLocation(), "cannot parse JSON file");

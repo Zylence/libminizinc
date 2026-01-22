@@ -21,6 +21,7 @@ Changes:
 -  Add ``zip`` and ``unzip`` functions to the standard library (:bugref:`967`).
 -  Add enum constructors lifted to arrays (:bugref:`965`).
 -  Add ``sliding_among`` constraint to the standard globals library (:bugref:`960`).
+-  Improve support for input of enum definitions using using JSON data files.
 
 Bug fixes:
 ^^^^^^^^^^

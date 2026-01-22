@@ -4023,6 +4023,8 @@ as JSON objects. A JSON input file needs to have the following structure:
 
   - The value of an enumerated type constructor call encoded as an object with a member with key ``"c"`` and a string value (the identifier of the constructor call), and a member with key ``"e"`` and a enumerated type (or constructor) object value (the argument to the call).
 
+  - A list of enum constructors used to define the members of an enumerated type. Each constructor is either a string value for an atomic enum value, or an object with members ``"c"`` and ``"e"`` as above for a constructor call.
+
 MiniZinc supports coercion of some JSON input types for more convenient input:
 
   - A list of values can be coerced to a set
