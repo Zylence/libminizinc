@@ -46,7 +46,7 @@ Bug fixes:
 -  Fix a flattening bug that introduced integer constants into float expressions,
    potentially leading to crashes (:bugref:`984`).
 -  Fix crash when emitting solutions with empty sets for the 
-  ``gecode_presolver`` solver interface (:bugref:`988`).
+   ``gecode_presolver`` solver interface (:bugref:`988`).
 -  Fix a bug in the flattening of output expressions that could result in
    the output model being invalid (:bugref:`975`).
 -  Fix type checking of return types of generic functions that return tuples
