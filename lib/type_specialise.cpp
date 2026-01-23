@@ -425,6 +425,20 @@ public:
         env.registerTupleType(ti);
       } else if (ti->type().bt() == Type::BT_RECORD) {
         env.registerRecordType(ti);
+      } else if (!ti->ranges().empty()) {
+        // Register correct type for type-inst as it's possible to instantiate a
+        // parameter with int index sets using an enum indexed array.
+        std::vector<unsigned int> enumIds(ti->ranges().size() + 1, 0);
+        for (unsigned int j = 0; j < ti->ranges().size(); j++) {
+          enumIds[j] = ti->ranges()[j]->type().typeId();
+        }
+        if (ti->domain() != nullptr) {
+          enumIds[ti->ranges().size()] = Expression::type(ti->domain()).typeId();
+        } else {
+          enumIds[ti->ranges().size()] = curType.elemType(env).typeId();
+        }
+        curType.typeId(env.registerArrayEnum(enumIds));
+        ti->type(curType);
       }
     }
     return true;

@@ -58,6 +58,8 @@ Bug fixes:
 -  Improve performance of function matching by avoiding to copy functions
    unnecessarily between models.
 -  Fix incorrect printing of anonymous enum values.
+-  Fix typing of generic functions with integer array indices when called with
+   enum indexed arrays (:bugref:`966`).
 
 .. _v2.9.4:
 
