@@ -388,7 +388,6 @@ void create_enum_mapper(EnvI& env, Model* m, unsigned int enumId, VarDecl* vd, M
         auto* sl_dzn = new StringLit(Location().introduce(), ASTString(std::string("to_enum(") +
                                                                        ident->str().c_str() + ","));
 
-        std::vector<Expression*> showIntArgs(1);
         Expression* enumCard;
         if (c->id() == env.constants.ids.anon_enum) {
           enumCard = c->arg(0);
@@ -396,16 +395,13 @@ void create_enum_mapper(EnvI& env, Model* m, unsigned int enumId, VarDecl* vd, M
           enumCard = Call::a(Location().introduce(), env.constants.ids.card, {c->arg(0)});
         }
         if (partCardinality.empty()) {
-          showIntArgs[0] = deopt;
           partCardinality.push_back(enumCard);
         } else {
-          showIntArgs[0] =
-              new BinOp(Location().introduce(), partCardinality.back(), BOT_PLUS, deopt);
           partCardinality.push_back(
               new BinOp(Location().introduce(), partCardinality.back(), BOT_PLUS, enumCard));
         }
 
-        Call* showInt = Call::a(Location().introduce(), env.constants.ids.show, showIntArgs);
+        Call* showInt = Call::a(Location().introduce(), env.constants.ids.show, {deopt});
         auto* construct_string_dzn =
             new BinOp(Location().introduce(), sl_dzn, BOT_PLUSPLUS, showInt);
         auto* closing_bracket = new StringLit(Location().introduce(), ASTString(")"));
