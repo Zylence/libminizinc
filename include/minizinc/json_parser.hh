@@ -56,6 +56,8 @@ protected:
   std::string expectString(std::istream& is);
   int expectInt(std::istream& is);
   void expectEof(std::istream& is);
+  Expression* parseEnumDef(std::istream& is);
+  Expression* parseEnumConstructorDef(std::istream& is, const std::string& seen);
   Expression* parseEnum(std::istream& is);
   Expression* parseEnumObject(std::istream& is, const std::string& seen);
   Expression* parseExp(std::istream& is, bool parseObjects = true, TypeInst* ti = nullptr);

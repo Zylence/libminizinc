@@ -163,12 +163,26 @@ public:
   bool registerFn(EnvI& env, FunctionI* fi, bool keepSorted = false, bool throwIfDuplicate = true);
   /// Sort functions by type
   void sortFn(const EnvI& env);
+  /// Sort functions with same name as \a fi by type
+  void sortFn(const EnvI& env, FunctionI* fi);
   /// Check that registered functions do not clash wrt overloading
   void checkFnOverloading(EnvI& env);
-  /// Fix function table after type checking
-  void fixFnMap();
+  /// Fix function table for fi during type checking
+  void fixFnMap(FunctionI* fi);
   /// Check whether all functions in function map can be flattened or evaluated
   void checkFnValid(EnvI& env, std::vector<TypeError>& errors);
+  /// Return the function declaration for the reficiation for a function with identifier \a id that
+  /// will take arguments \a args.
+  ///
+  /// WARNING: \a args is expected to include the reification argument.
+  FunctionI* matchReification(EnvI& env, const ASTString& id, const std::vector<Expression*>& args,
+                              bool canHalfReify, bool strictEnums) const;
+  /// Return the function declaration for the reficiation for a function with identifier \a id that
+  /// will take the argument types \a t.
+  ///
+  /// WARNING: \a t is expected to include the type of the reification variable.
+  FunctionI* matchReification(EnvI& env, const ASTString& id, const std::vector<Type>& t,
+                              bool canHalfReify, bool strictEnums) const;
   /// Return function declaration for \a id matching \a args
   FunctionI* matchFn(EnvI& env, const ASTString& id, const std::vector<Expression*>& args,
                      bool strictEnums) const;
@@ -177,6 +191,9 @@ public:
                      bool strictEnums) const;
   /// Return function declaration matching call \a c
   FunctionI* matchFn(EnvI& env, Call* c, bool strictEnums, bool throwIfNotFound = false) const;
+  /// Return function declarations that are potential overloads for call \a c (same identifier and
+  /// same number of arguments)
+  std::vector<FunctionI*> potentialOverloads(EnvI& env, Call* c) const;
   /// Return function declaration for reverse mapper for type \a t
   FunctionI* matchRevMap(EnvI& env, const Type& t) const;
   /// Check if function with this name exists
@@ -376,6 +393,39 @@ public:
   std::ostream& evalOutput(std::ostream& os, std::ostream& log);
 };
 
+/// Boolean evaluation context
+enum BCtx { C_ROOT, C_POS, C_NEG, C_MIX };
+
+/// Evaluation context
+struct Ctx {
+  /// Boolean context
+  BCtx b;
+  /// Integer context
+  BCtx i;
+  /// Boolen negation flag
+  bool neg;
+  /// Default constructor (root context)
+  Ctx() : b(C_ROOT), i(C_MIX), neg(false) {}
+  /// Copy constructor
+  Ctx(const Ctx& ctx) : b(ctx.b), i(ctx.i), neg(ctx.neg) {}
+  /// Assignment operator
+  Ctx& operator=(const Ctx& ctx) {
+    if (this != &ctx) {
+      b = ctx.b;
+      i = ctx.i;
+      neg = ctx.neg;
+    }
+    return *this;
+  }
+  /// Return true variable if in root context, nullptr otherwise
+  VarDecl* partialityVar(EnvI& env) const;
+};
+
+/// Turn \a c into positive context
+BCtx operator+(const BCtx& c);
+/// Negate context \a c
+BCtx operator-(const BCtx& c);
+
 class CallStackItem {
 private:
   EnvI& _env;
@@ -383,7 +433,7 @@ private:
   bool _maybePartial;
 
 public:
-  CallStackItem(EnvI& env0, Expression* e);
+  CallStackItem(EnvI& env0, Expression* e, const Ctx& ctx = Ctx());
   CallStackItem(EnvI& env0, Id* ident, IntVal i);
   void replace();
   ~CallStackItem();

@@ -365,7 +365,7 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
   Ctx nctx = ctx;
   nctx.neg = false;
   ASTString cid = c->id();
-  CallStackItem _csi(env, e);
+  CallStackItem _csi(env, e, input_ctx);
 
   if (cid == env.constants.ids.bool2int && c->type().dim() == 0) {
     if (ctx.neg) {
@@ -531,8 +531,8 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
       if (cid == env.constants.ids.mzn_reverse_map_var) {
         env.inReverseMapVar = true;
       }
-      if (cid == env.constants.ids.clause && Expression::isa<ArrayLit>(c->arg(0)) &&
-          Expression::isa<ArrayLit>(c->arg(1))) {
+      if (decl->e() == nullptr && cid == env.constants.ids.clause &&
+          Expression::isa<ArrayLit>(c->arg(0)) && Expression::isa<ArrayLit>(c->arg(1))) {
         Ctx argctx = nctx;
 
         // handle negated args first, try to make them positive
@@ -581,7 +581,7 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
               positives.emplace_back(notBoe0);
             } else {
               EE res = flat_exp(env, argctx, negative(), nullptr, env.constants.varTrue);
-              if (Expression::type(res.r()).isPar()) {
+              if (Expression::type(res.r()).isPar() && !Expression::type(res.r()).isOpt()) {
                 if (eval_bool(env, res.r())) {
                   // this element is irrelevant
                 } else {
@@ -648,8 +648,10 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
           for (unsigned int i = 0; i < al->size(); i++) {
             EE res = flat_exp(env, argctx, (*al)[i], nullptr, env.constants.varTrue);
             if (Expression::type(res.r()).isPar()) {
-              if (eval_bool(env, res.r()) == is_conj) {
-                // this element is irrelevant
+              if ((Expression::type(res.r()).isOpt() &&
+                   eval_par(env, res.r()) == env.constants.absent) ||
+                  eval_bool(env, res.r()) == is_conj) {
+                // this element is irrelevant, ignore
               } else {
                 // this element subsumes all other elements
                 flat_args = {res.r()};
@@ -662,7 +664,9 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
           {
             GCLock lock;
             al_new = new ArrayLit(Expression::loc(al), to_exp_vec(flat_args));
-            Expression::type(al_new(), Type::varbool(1));
+            Type al_new_t = Type::varbool(1);
+            al_new_t.ot((Expression::type(c->arg(0)).ot()));
+            Expression::type(al_new(), al_new_t);
             Expression::cast<ArrayLit>(al_new())->flat(true);
           }
         }
@@ -967,7 +971,9 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
       if (cid == c->id()) {
         try {
           auto* cr_d = env.model->matchFn(env, cr_c, false);
-          if (cr_d != nullptr) {
+          if (cr_d != nullptr &&
+              !cr_d->ann().contains(env.constants.ann.mzn_internal_representation) &&
+              cr_d->rtype(env, e_args, cr_c, false).isSubtypeOf(env, c->type(), false)) {
             decl = cr_d;
           }
         } catch (TypeError&) { /* NOLINT(bugprone-empty-catch) */
@@ -1012,7 +1018,10 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
       cr = cr_c;
     }
 
-    auto cit = env.cseMapFind(cr());
+    auto cit = env.cseMapEnd();
+    if (!ctx.neg && !Expression::type(cr()).isAnn()) {
+      cit = env.cseMapFind(cr());
+    }
     if (cit != env.cseMapEnd()) {
       if (Expression::type(e).isbool() && !Expression::type(e).isOpt()) {
         cse_result_change_ctx(env, cit->second.r, ctx.b);
@@ -1063,16 +1072,8 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
         }
         argtypes.push_back(Type::varbool());
         GCLock lock;
-        ASTString r_cid;
-        FunctionI* reif_decl(nullptr);
-        if (env.fopts.enableHalfReification && ctx.b == C_POS) {
-          r_cid = EnvI::halfReifyId(cid);
-          reif_decl = env.model->matchFn(env, r_cid, argtypes, false);
-        }
-        if (reif_decl == nullptr) {
-          r_cid = env.reifyId(cid);
-          reif_decl = env.model->matchFn(env, r_cid, argtypes, false);
-        }
+        FunctionI* reif_decl = env.model->matchReification(
+            env, cid, argtypes, env.fopts.enableHalfReification && ctx.b == C_POS, false);
         if ((reif_decl != nullptr) && (reif_decl->e() != nullptr)) {
           add_path_annotation(env, reif_decl->e());
           VarDecl* reif_b;
@@ -1092,7 +1093,7 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
                   args_e[i] = args[i]();
                 }
                 args_e[args.size()] = env.constants.literalFalse;
-                Call* reif_call = Call::a(Location().introduce(), r_cid, args_e);
+                Call* reif_call = Call::a(Location().introduce(), reif_decl->id(), args_e);
                 reif_call->type(Type::varbool());
                 reif_call->decl(reif_decl);
                 flat_exp(env, Ctx(), reif_call, env.constants.varTrue, env.constants.varTrue);
@@ -1125,7 +1126,7 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
       }
     call_nonreif:
       if (decl->e() == nullptr ||
-          (Expression::type(cr()).isPar() && !Expression::type(cr()).isAnn() &&
+          (Expression::type(cr()).isPar() && Expression::type(cr()).bt() != Type::BT_ANN &&
            !Expression::type(decl->e()).cv())) {
         Call* cr_c = Expression::cast<Call>(cr());
         /// All builtins are total
@@ -1134,7 +1135,7 @@ EE flatten_call(EnvI& env, const Ctx& input_ctx, Expression* e, VarDecl* r, VarD
           argt[i] = Expression::type(cr_c->arg(i));
         }
         Type callt = decl->rtype(env, argt, nullptr, false);
-        if (callt.isPar() && callt.bt() != Type::BT_ANN) {
+        if (callt.isPar()) {
           GCLock lock;
           if (callt.isbool() && !callt.isOpt()) {
             ret.b = bind(env, Ctx(), b, env.constants.literalTrue);

@@ -10,9 +10,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include <minizinc/astexception.hh>
+#include <minizinc/aststring.hh>
 #include <minizinc/flatten_internal.hh>
 #include <minizinc/model.hh>
 #include <minizinc/prettyprinter.hh>
+#include <minizinc/type.hh>
 
 #include <algorithm>
 #include <unordered_set>
@@ -44,7 +46,7 @@ bool Model::FnEntry::checkPoly(const EnvI& env, const Type& t) {
   }
   if (t.structBT()) {
     StructType* st = env.getStructType(t);
-    for (size_t i = 0; i < st->size(); ++i) {
+    for (unsigned int i = 0; i < st->size(); ++i) {
       if (checkPoly(env, (*st)[i])) {
         return true;
       }
@@ -296,7 +298,7 @@ struct TIIDInfo {
 void TypeInst::collectTypeIds(std::unordered_map<ASTString, size_t>& seen_tiids,
                               std::vector<TIIDInfo>& type_ids) const {
   auto* al = Expression::cast<ArrayLit>(domain());
-  for (size_t i = 0; i < al->size(); i++) {
+  for (unsigned int i = 0; i < al->size(); i++) {
     auto* ti = Expression::cast<TypeInst>((*al)[i]);
     if (ti->type().bt() == Type::BT_TOP) {
       // If type is top, either this is a TIId, or it is caused by <>
@@ -396,7 +398,7 @@ void Model::addPolymorphicInstances(EnvI& env, Model::FnEntry& fe, std::vector<F
         // New complete instance
         // First, update cur types
         auto* tis = Expression::cast<ArrayLit>(paramtuple->domain());
-        for (size_t i = 0; i < tis->size(); ++i) {
+        for (unsigned int i = 0; i < tis->size(); ++i) {
           cur.t[i] = Expression::type((*tis)[i]);
           if (cur.t[i].bt() == Type::BT_TUPLE && cur.t[i].typeId() == 0) {
             env.registerTupleType(Expression::cast<TypeInst>((*tis)[i]));
@@ -478,7 +480,9 @@ bool Model::registerFn(EnvI& env, FunctionI* fi, bool keepSorted, bool throwIfDu
               fi->ann().add(deprecated);
             }
             FunctionI* old_fi = i.fi;
-            i = FnEntry(env, fi);
+            if (!fe.isPolymorphic) {
+              i = fe;
+            }
             // If we are replacing a polymorphic function using a new polymorphic function, then
             // replace in all entries generated using addPolymorphicInstances
             if (i.isPolymorphic) {
@@ -664,12 +668,25 @@ FunctionI* Model::matchFn(EnvI& env, const ASTString& id, const std::vector<Type
 void Model::mergeStdLib(EnvI& env, Model* m) const {
   for (const auto& it : _fnmap) {
     for (const auto& cit : it.second) {
-      if (cit.fi->fromStdLib()) {
+      if (cit.fi->fromStdLib() && !cit.isPolymorphicVariant) {
         (void)m->registerFn(env, cit.fi);
       }
     }
   }
   m->sortFn(env);
+}
+
+void Model::sortFn(const EnvI& env, FunctionI* fi) {
+  Model* m = this;
+  while (m->_parent != nullptr) {
+    m = m->_parent;
+  }
+  auto& it = *m->_fnmap.find(fi->id());
+  // Sort all functions by type
+  std::sort(it.second.begin(), it.second.end(),
+            [&env](const Model::FnEntry& e1, const Model::FnEntry& e2) {
+              return Model::FnEntry::compare(env, e1, e2);
+            });
 }
 
 void Model::sortFn(const EnvI& env) {
@@ -686,13 +703,15 @@ void Model::sortFn(const EnvI& env) {
   }
 }
 
-void Model::fixFnMap() {
+void Model::fixFnMap(FunctionI* fi) {
   Model* m = this;
   while (m->_parent != nullptr) {
     m = m->_parent;
   }
-  for (auto& it : m->_fnmap) {
-    for (auto& i : it.second) {
+
+  auto& it = *m->_fnmap.find(fi->id());
+  for (auto& i : it.second) {
+    if (i.fi == fi) {
       for (unsigned int j = 0; j < i.t.size(); j++) {
         if (i.t[j].isunknown() || i.t[j].structBT()) {
           i.t[j] = i.fi->param(j)->type();
@@ -722,7 +741,7 @@ void Model::checkFnValid(EnvI& env, std::vector<TypeError>& errors) {
       }
       if (fi->ann().contains(env.constants.ann.output_only)) {
         std::vector<Type> tys(fi->paramCount());
-        for (int i = 0; i < fi->paramCount(); ++i) {
+        for (unsigned int i = 0; i < fi->paramCount(); ++i) {
           tys[i] = fi->param(i)->type();
           tys[i].mkPar(env);
         }
@@ -747,7 +766,7 @@ void Model::checkFnValid(EnvI& env, std::vector<TypeError>& errors) {
             "FlatZinc builtin functions must be predicates (i.e., have `var bool` return type)");
         continue;
       }
-      for (int i = 0; i < fi->paramCount(); ++i) {
+      for (unsigned int i = 0; i < fi->paramCount(); ++i) {
         const Type& t = fi->param(i)->type();
         if (t.isOpt() || t.structBT() || t.bt() == Type::BT_TOP) {
           errors.emplace_back(
@@ -844,6 +863,46 @@ int match_idx(std::vector<FunctionI*>& matched, Expression*& botarg, EnvI& env,
 }
 }  // namespace
 
+FunctionI* Model::matchReification(EnvI& env, const ASTString& id,
+                                   const std::vector<Expression*>& args, bool canHalfReify,
+                                   bool strictEnums) const {
+  std::vector<Type> t;
+  t.reserve(args.size());
+  for (const auto* e : args) {
+    t.push_back(Expression::type(e));
+  }
+  return this->matchReification(env, id, t, canHalfReify, strictEnums);
+}
+
+FunctionI* Model::matchReification(EnvI& env, const ASTString& id, const std::vector<Type>& t,
+                                   bool canHalfReify, bool strictEnums) const {
+  ASTString reif_id = env.reifyId(id);
+  FunctionI* reif_decl = this->matchFn(env, reif_id, t, strictEnums);
+  if (canHalfReify) {
+    ASTString imp_id = EnvI::halfReifyId(id);
+    if (FunctionI* imp_decl = this->matchFn(env, imp_id, t, strictEnums)) {
+      // If reification failed, then go with half-reification immediately
+      if (reif_decl == nullptr) {
+        return imp_decl;
+      }
+
+      // If there is both a reification and a half-reification, then make sure the half-reification
+      // is at least as specific as the reification. That is the parameters of the matching
+      // half-reification declaration should be the same or subtypes of the matching reification.
+      assert(imp_decl->paramCount() == reif_decl->paramCount());
+      for (unsigned int i = 0; i < imp_decl->paramCount(); ++i) {
+        Type a = imp_decl->param(i)->ti()->type();
+        Type b = reif_decl->param(i)->ti()->type();
+        if (!env.isSubtype(a, b, strictEnums)) {
+          return reif_decl;
+        }
+      }
+      return imp_decl;
+    }
+  }
+  return reif_decl;
+}
+
 FunctionI* Model::matchFn(EnvI& env, const ASTString& id, const std::vector<Expression*>& args,
                           bool strictEnums) const {
   if (id == env.constants.varRedef->id()) {
@@ -867,10 +926,11 @@ FunctionI* Model::matchFn(EnvI& env, const ASTString& id, const std::vector<Expr
   if (matched.size() == 1) {
     return matched[0];
   }
-  Type t = matched[0]->ti()->type();
+  auto t = matched[0]->rtype(env, args, nullptr, false);
   t.mkPar(env);
   for (unsigned int i = 1; i < matched.size(); i++) {
-    if (!env.isSubtype(t, matched[i]->ti()->type(), strictEnums)) {
+    auto rt = matched[i]->rtype(env, args, nullptr, false);
+    if (!env.isSubtype(t, rt, strictEnums)) {
       throw TypeError(env, Expression::loc(botarg),
                       "ambiguous overloading on return type of function");
     }
@@ -913,6 +973,9 @@ FunctionI* Model::matchFn(EnvI& env, Call* c, bool strictEnums, bool throwIfNotF
     return nullptr;
   }
   const std::vector<FnEntry>& v = it->second;
+  if (v.size() == 1 && v[0].fi == c->decl()) {
+    return c->decl();
+  }
   std::vector<FunctionI*> matched;
   Expression* botarg = nullptr;
   for (const auto& i : v) {
@@ -998,6 +1061,61 @@ FunctionI* Model::matchFn(EnvI& env, Call* c, bool strictEnums, bool throwIfNotF
   return matched[0];
 }
 
+std::vector<FunctionI*> Model::potentialOverloads(EnvI& env, Call* c) const {
+  if (c->id() == env.constants.varRedef->id()) {
+    return {env.constants.varRedef};
+  }
+  const Model* m = this;
+  while (m->_parent != nullptr) {
+    m = m->_parent;
+  }
+  auto it = m->_fnmap.find(c->id());
+  if (it == m->_fnmap.end()) {
+    std::ostringstream oss;
+    oss << "no function or predicate with name `";
+    oss << c->id() << "' found";
+
+    ASTString mostSimilar;
+    int minEdits = 3;
+    for (const auto& decls : m->_fnmap) {
+      if (std::abs(static_cast<int>(c->id().size()) - static_cast<int>(decls.first.size())) <= 3) {
+        int edits = c->id().levenshteinDistance(decls.first);
+        if (edits < minEdits && edits < std::min(c->id().size(), decls.first.size())) {
+          minEdits = edits;
+          mostSimilar = decls.first;
+        }
+      }
+    }
+    if (!mostSimilar.empty()) {
+      oss << ", did you mean `" << mostSimilar << "'?";
+    }
+    throw TypeError(env, Expression::loc(c), oss.str());
+  }
+
+  const std::vector<FnEntry>& v = it->second;
+  std::vector<FunctionI*> matched;
+  for (const auto& i : v) {
+    if (i.t.size() == c->argCount()) {
+      matched.push_back(i.fi);
+    }
+  }
+  if (matched.empty()) {
+    std::ostringstream oss;
+    oss << "no function or predicate with this signature found: `";
+    oss << c->id() << "(";
+    for (unsigned int i = 0; i < c->argCount(); i++) {
+      oss << Expression::type(c->arg(i)).toString(env);
+      if (i < c->argCount() - 1) {
+        oss << ",";
+      }
+    }
+    oss << ")'\n";
+    throw TypeError(env, Expression::loc(c), oss.str());
+  }
+
+  return matched;
+}
+
 namespace {
 int first_overloaded(EnvI& env, const std::vector<Model::FnEntry>& v_f, int i_f) {
   int first_i_f = i_f;
@@ -1023,7 +1141,8 @@ int first_overloaded(EnvI& env, const std::vector<Model::FnEntry>& v_f, int i_f)
 
 bool Model::sameOverloading(EnvI& env, const std::vector<Expression*>& args, FunctionI* f,
                             FunctionI* g) const {
-  if (f->id() == env.constants.varRedef->id() || g->id() == env.constants.varRedef->id()) {
+  if (f->isMonomorphised() || g->isMonomorphised() || f->id() == env.constants.varRedef->id() ||
+      g->id() == env.constants.varRedef->id()) {
     return false;
   }
   const Model* m = this;
@@ -1055,7 +1174,7 @@ bool Model::sameOverloading(EnvI& env, const std::vector<Expression*>& args, Fun
     // not the same number of overloaded versions
     return false;
   }
-  for (; first_i_f <= i_f; first_i_f++, first_i_g++) {
+  for (; first_i_f <= static_cast<unsigned int>(i_f); first_i_f++, first_i_g++) {
     if (!(v_f[first_i_f].t == v_g[first_i_g].t)) {
       // one of the overloaded versions does not agree in the types
       return false;

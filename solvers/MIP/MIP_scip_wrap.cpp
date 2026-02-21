@@ -39,15 +39,21 @@ ScipPlugin::ScipPlugin()
           {
               "libscip",
               "scip",
-              "C:\\Program Files\\SCIPOptSuite 8.2.4\\bin\\libscip.dll",
-              "C:\\Program Files\\SCIPOptSuite 8.2.3\\bin\\libscip.dll",
-              "C:\\Program Files\\SCIPOptSuite 8.2.2\\bin\\libscip.dll",
-              "C:\\Program Files\\SCIPOptSuite 8.2.1\\bin\\libscip.dll",
-              "C:\\Program Files\\SCIPOptSuite 8.2.0\\bin\\libscip.dll",
-              "C:\\Program Files\\SCIPOptSuite 8.1.4\\bin\\libscip.dll",
-              "C:\\Program Files\\SCIPOptSuite 8.1.3\\bin\\libscip.dll",
-              "C:\\Program Files\\SCIPOptSuite 8.1.2\\bin\\libscip.dll",
-              "C:\\Program Files\\SCIPOptSuite 8.1.1\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.2.4\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.2.3\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.2.2\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.2.1\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.2.0\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.1.4\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.1.3\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.1.2\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.1.1\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.1.0\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.0.4\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.0.3\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.0.2\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.0.1\\bin\\libscip.dll",
+              "C:\\Program Files\\SCIPOptSuite 9.0.0\\bin\\libscip.dll",
               "C:\\Program Files\\SCIPOptSuite 8.1.0\\bin\\libscip.dll",
               "C:\\Program Files\\SCIPOptSuite 8.0.4\\bin\\libscip.dll",
               "C:\\Program Files\\SCIPOptSuite 8.0.3\\bin\\libscip.dll",
@@ -276,8 +282,6 @@ bool MIPScipWrapper::Options::processOption(int& i, vector<string>& argv,
     return false;
   }
   return true;
-error:
-  return false;
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
@@ -646,7 +650,7 @@ SCIP_VAR** _scipVarsPtr = nullptr;
 }  // namespace
 
 /** initialization method of event handler (called after problem was transformed) */
-static SCIP_DECL_EVENTINIT(eventInitBestsol) { /*lint --e{715}*/
+static SCIP_DECL_EVENTINIT(event_init_best_sol) { /*lint --e{715}*/
   assert(scip != nullptr);
   assert(eventhdlr != nullptr);
   assert(strcmp(_cb_plugin->SCIPeventhdlrGetName(eventhdlr), EVENTHDLR_NAME) == 0);
@@ -659,7 +663,7 @@ static SCIP_DECL_EVENTINIT(eventInitBestsol) { /*lint --e{715}*/
 }
 
 /** deinitialization method of event handler (called before transformed problem is freed) */
-static SCIP_DECL_EVENTEXIT(eventExitBestsol) { /*lint --e{715}*/
+static SCIP_DECL_EVENTEXIT(event_exit_best_sol) { /*lint --e{715}*/
   assert(scip != nullptr);
   assert(eventhdlr != nullptr);
   assert(strcmp(_cb_plugin->SCIPeventhdlrGetName(eventhdlr), EVENTHDLR_NAME) == 0);
@@ -672,7 +676,7 @@ static SCIP_DECL_EVENTEXIT(eventExitBestsol) { /*lint --e{715}*/
 }
 
 /** execution method of event handler */
-static SCIP_DECL_EVENTEXEC(eventExecBestsol) { /*lint --e{715}*/
+static SCIP_DECL_EVENTEXEC(event_exec_best_sol) { /*lint --e{715}*/
   SCIP_SOL* bestsol;
   SCIP_Real objVal;
   int newincumbent = 0;
@@ -738,12 +742,12 @@ SCIP_RETCODE MIPScipWrapper::includeEventHdlrBestsol() {
   /* create event handler for events on watched variables */
   SCIP_PLUGIN_CALL_R(
       _plugin, _plugin->SCIPincludeEventhdlrBasic(_scip, &eventhdlr, EVENTHDLR_NAME, EVENTHDLR_DESC,
-                                                  eventExecBestsol, eventhdlrdata));
+                                                  event_exec_best_sol, eventhdlrdata));
   assert(eventhdlr != nullptr);
 
   /// Not for sub-SCIPs
-  SCIP_PLUGIN_CALL_R(_plugin, _plugin->SCIPsetEventhdlrInit(_scip, eventhdlr, eventInitBestsol));
-  SCIP_PLUGIN_CALL_R(_plugin, _plugin->SCIPsetEventhdlrExit(_scip, eventhdlr, eventExitBestsol));
+  SCIP_PLUGIN_CALL_R(_plugin, _plugin->SCIPsetEventhdlrInit(_scip, eventhdlr, event_init_best_sol));
+  SCIP_PLUGIN_CALL_R(_plugin, _plugin->SCIPsetEventhdlrExit(_scip, eventhdlr, event_exit_best_sol));
 
   return SCIP_OKAY;
 }
@@ -792,7 +796,7 @@ MIPScipWrapper::Status MIPScipWrapper::convertStatus(SCIP_STATUS scipStatus) {
   return s;
 }
 
-SCIP_DECL_MESSAGEWARNING(printMsg) { cerr << msg << flush; }
+SCIP_DECL_MESSAGEWARNING(print_msg) { cerr << msg << flush; }
 
 SCIP_RETCODE MIPScipWrapper::solveSCIP() {  // Move into ancestor?
 
@@ -834,8 +838,8 @@ SCIP_RETCODE MIPScipWrapper::solveSCIP() {  // Move into ancestor?
   } else {
     SCIP_MESSAGEHDLR* pHndl = nullptr;
     SCIP_PLUGIN_CALL_R(
-        _plugin, _plugin->SCIPmessagehdlrCreate(&pHndl, FALSE, nullptr, FALSE, printMsg, printMsg,
-                                                printMsg, nullptr, nullptr));
+        _plugin, _plugin->SCIPmessagehdlrCreate(&pHndl, FALSE, nullptr, FALSE, print_msg, print_msg,
+                                                print_msg, nullptr, nullptr));
     SCIP_PLUGIN_CALL_R(_plugin, _plugin->SCIPsetMessagehdlr(_scip, pHndl));
   }
 

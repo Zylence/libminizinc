@@ -21,7 +21,7 @@
 
 // #define MINIZINC_GC_STATS
 
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
 #include <map>
 
 struct GCStat {
@@ -167,6 +167,8 @@ private:
 public:
   /// Acquire garbage collector lock for this thread
   static void lock();
+  /// Acquire garbage collector lock for this thread and do not run GC
+  static void lockNoGC();
   /// Release garbage collector lock for this thread
   static void unlock();
   /// Manually trigger garbage collector (must be unlocked)
@@ -191,7 +193,7 @@ public:
   /// Return maximum allocated memory (high water mark)
   static size_t maxMem();
 
-#if defined(MINIZINC_GC_STATS)
+#ifdef MINIZINC_GC_STATS
   /// Return statistics object
   static std::map<int, GCStat>& stats();
 #endif

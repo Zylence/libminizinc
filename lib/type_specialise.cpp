@@ -332,7 +332,7 @@ public:
     auto* al = Expression::cast<ArrayLit>(struct_ti->domain());
     assert(al->size() == tt->size() ||
            al->size() + 1 == tt->size());  // May have added concrete type for reification
-    for (size_t i = 0; i < al->size(); i++) {
+    for (unsigned int i = 0; i < al->size(); i++) {
       auto* ti = Expression::cast<TypeInst>((*al)[i]);
       Type curType = ti->type();
       Type concrete_type = (*tt)[i];
@@ -413,7 +413,7 @@ public:
             ti_map.emplace(tiid->v(), Type::parint(curType.dim()));
             // add concrete number of ranges
             std::vector<TypeInst*> newRanges(curType.dim());
-            for (unsigned int k = 0; k < curType.dim(); k++) {
+            for (int k = 0; k < curType.dim(); k++) {
               newRanges[k] = new TypeInst(Location().introduce(), Type::parint());
             }
             ti->setRanges(newRanges);
@@ -425,24 +425,40 @@ public:
         env.registerTupleType(ti);
       } else if (ti->type().bt() == Type::BT_RECORD) {
         env.registerRecordType(ti);
+      } else if (!ti->ranges().empty()) {
+        // Register correct type for type-inst as it's possible to instantiate a
+        // parameter with int index sets using an enum indexed array.
+        std::vector<unsigned int> enumIds(ti->ranges().size() + 1, 0);
+        for (unsigned int j = 0; j < ti->ranges().size(); j++) {
+          enumIds[j] = ti->ranges()[j]->type().typeId();
+        }
+        if (ti->domain() != nullptr) {
+          enumIds[ti->ranges().size()] = Expression::type(ti->domain()).typeId();
+        } else {
+          enumIds[ti->ranges().size()] = curType.elemType(env).typeId();
+        }
+        curType.typeId(env.registerArrayEnum(enumIds));
+        ti->type(curType);
       }
     }
     return true;
   }
 
   static void updateReturnTypeInst(EnvI& env, ASTStringMap<Type>& ti_map, TypeInst* ti) {
-    if (ti->type().bt() == Type::BT_TUPLE) {
+    if (ti->type().structBT()) {
       auto* al = Expression::cast<ArrayLit>(ti->domain());
       auto* st = env.getStructType(ti->type());
+      bool isVar = false;
       for (unsigned int i = 0; i < st->size(); i++) {
         updateReturnTypeInst(env, ti_map, Expression::cast<TypeInst>((*al)[i]));
+        isVar |= Expression::type((*al)[i]).isvar();
       }
-    } else if (ti->type().bt() == Type::BT_RECORD) {
-      auto* al = Expression::cast<ArrayLit>(ti->domain());
-      auto* st = env.getStructType(ti->type());
-      for (unsigned int i = 0; i < st->size(); i++) {
-        updateReturnTypeInst(env, ti_map, Expression::cast<TypeInst>((*al)[i]));
-      }
+      auto ti_t = ti->type();
+      auto ti_tid = ti_t.typeId();
+      ti_t.typeId(0);
+      ti_t.ti(isVar ? Type::TI_VAR : Type::TI_PAR);
+      ti_t.typeId(ti_tid);
+      ti->type(ti_t);
     } else if (TIId* tiid = Expression::dynamicCast<TIId>(ti->domain())) {
       Type ret_type = ti_map.find(tiid->v())->second;
       if (ret_type.dim() != 0 && ti->type().dim() == 0) {
@@ -502,7 +518,7 @@ public:
         } else {
           // add concrete number of ranges
           std::vector<TypeInst*> newRanges(ret_type.dim());
-          for (unsigned int k = 0; k < ret_type.dim(); k++) {
+          for (int k = 0; k < ret_type.dim(); k++) {
             newRanges[k] = new TypeInst(Location().introduce(), Type::parint());
           }
           auto t = ti->type();
@@ -566,30 +582,33 @@ public:
       auto* halfReif =
           _env.model->matchFn(_env, EnvI::halfReifyId(lookup.baseName), concrete_types, false);
       assert(call->decl() == nonReif || call->decl() == reified || call->decl() == halfReif);
-      std::vector<FunctionI*> matches({nonReif, reified, halfReif});
+      std::vector<std::pair<FunctionI*, std::vector<Type>>> matches(
+          {{nonReif, lookup.argTypes}, {reified, concrete_types}, {halfReif, concrete_types}});
       if (!lookup.parExists) {
         // Also create par version in case required by output.
         // This is needed since if this instance can't be made par by the type checker,
         // but we actually have a par version of the polymorphic function, we should use it.
         std::vector<Type> concrete_types = lookup.parTypes;
         auto* parNonReif = _env.model->matchFn(_env, lookup.baseName, concrete_types, false);
-        if (nonReif != nullptr && nonReif != parNonReif) {
-          matches.push_back(parNonReif);
+        if (nonReif != nullptr && (nonReif != parNonReif || nonReif->isPolymorphic())) {
+          matches.emplace_back(parNonReif, concrete_types);
         }
         concrete_types.push_back(Type::parbool());
         auto* parReified =
             _env.model->matchFn(_env, _env.reifyId(lookup.baseName), concrete_types, false);
         if (parReified != nullptr && reified != parReified) {
-          matches.push_back(parReified);
+          matches.emplace_back(parReified, concrete_types);
         }
         auto* parHalfReif =
             _env.model->matchFn(_env, EnvI::halfReifyId(lookup.baseName), concrete_types, false);
         if (parHalfReif != nullptr && halfReif != parHalfReif) {
-          matches.push_back(parHalfReif);
+          matches.emplace_back(parHalfReif, concrete_types);
         }
       }
 
-      for (auto* fi : matches) {
+      for (auto& m : matches) {
+        auto* fi = m.first;
+        auto& concrete_types = m.second;
         if (fi == nullptr) {
           continue;
         }
@@ -698,6 +717,9 @@ public:
      - keep a registry of (name,concrete type) -> instantiated function
  */
 void type_specialise(Env& env, Model* model, TyperFn& typer) {
+  // Don't warn about enum2int emitted from specialised functions
+  env.envi().warnImplicitEnum2Int = false;
+
   ConcreteCallAgenda agenda;
 
   CollectConcreteCallsFromItems cci(agenda);

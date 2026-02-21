@@ -18,6 +18,7 @@
 #include <minizinc/file_utils.hh>
 
 #include <algorithm>
+#include <cstdint>  // Required on some platforms for miniz
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -104,7 +105,7 @@ std::string progpath() {
 #endif
 
 bool file_exists(const std::string& filename) {
-#if defined(HAS_GETFILEATTRIBUTES)
+#ifdef HAS_GETFILEATTRIBUTES
   DWORD dwAttrib = GetFileAttributesW(utf8_to_wide(filename).c_str());
 
   return dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY) == 0;
@@ -115,7 +116,7 @@ bool file_exists(const std::string& filename) {
 }
 
 bool directory_exists(const std::string& dirname) {
-#if defined(HAS_GETFILEATTRIBUTES)
+#ifdef HAS_GETFILEATTRIBUTES
   DWORD dwAttrib = GetFileAttributesW(utf8_to_wide(dirname).c_str());
 
   return dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY) != 0;

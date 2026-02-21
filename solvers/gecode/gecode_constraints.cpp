@@ -606,7 +606,7 @@ void p_array_bool_and_imp(SolverInstanceBase& s, const Call* call) {
   auto& gi = static_cast<GecodeSolverInstance&>(s);
   BoolVarArgs bv = gi.arg2boolvarargs(call->arg(0));
   BoolVar b1 = gi.arg2boolvar(call->arg(1));
-  for (int i = static_cast<int>(bv.size()); (i--) != 0;) {
+  for (int i = bv.size(); (i--) != 0;) {
     rel(*gi.currentSpace, b1, Gecode::BoolOpType::BOT_IMP, bv[i], 1,
         GecodeSolverInstance::ann2icl(ann));
   }
@@ -1387,26 +1387,28 @@ void p_cumulatives(SolverInstanceBase& s, const Call* call) {
   }
 }
 
-void p_among_seq_int(SolverInstanceBase& s, const Call* call) {
+void p_sliding_among_int(SolverInstanceBase& s, const Call* call) {
   const Annotation& ann = Expression::ann(call);
   auto& gi = static_cast<GecodeSolverInstance&>(s);
-  Gecode::IntVarArgs x = gi.arg2intvarargs(call->arg(0));
-  IntSet S = gi.arg2intset(s.env().envi(), call->arg(1));
+
+  int l = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(0))).toInt());
+  int u = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(1))).toInt());
   int q = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(2))).toInt());
-  int l = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(3))).toInt());
-  int u = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(4))).toInt());
+  Gecode::IntVarArgs x = gi.arg2intvarargs(call->arg(3));
+  IntSet S = gi.arg2intset(s.env().envi(), call->arg(4));
   unshare(*gi.currentSpace, x);
   sequence(*gi.currentSpace, x, S, q, l, u, GecodeSolverInstance::ann2icl(ann));
 }
 
-void p_among_seq_bool(SolverInstanceBase& s, const Call* call) {
+void p_sliding_among_bool(SolverInstanceBase& s, const Call* call) {
   const Annotation& ann = Expression::ann(call);
   auto& gi = static_cast<GecodeSolverInstance&>(s);
-  BoolVarArgs x = gi.arg2boolvarargs(call->arg(0));
-  bool val = Expression::cast<BoolLit>(call->arg(1))->v();
+
+  int l = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(0))).toInt());
+  int u = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(1))).toInt());
   int q = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(2))).toInt());
-  int l = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(3))).toInt());
-  int u = static_cast<int>(IntLit::v(Expression::cast<IntLit>(call->arg(4))).toInt());
+  BoolVarArgs x = gi.arg2boolvarargs(call->arg(3));
+  bool val = Expression::cast<BoolLit>(call->arg(4))->v();
   IntSet S(static_cast<int>(val), static_cast<int>(val));
   unshare(*gi.currentSpace, x);
   sequence(*gi.currentSpace, x, S, q, l, u, GecodeSolverInstance::ann2icl(ann));

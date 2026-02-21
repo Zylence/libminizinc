@@ -64,8 +64,7 @@ EE flatten_id(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b,
       idx[0] = bodyidx;
       auto* aa = new ArrayAccess(Expression::loc(id), id, idx);
       aanot->e(aa);
-      Type tt = id->type();
-      tt.dim(0);
+      Type tt = id->type().elemType(env);
       aa->type(tt);
       aanot->type(aa->type());
       cp->type(id->type());
@@ -102,6 +101,7 @@ EE flatten_id(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b,
       if (Expression::type(vd->e()).isPar() && Expression::type(vd->e()).dim() == 0) {
         rete = eval_par(env, vd->e());
         if (vd->toplevel() && (vd->ti()->domain() != nullptr) && !vd->ti()->computedDomain()) {
+          check_index_sets(env, vd, rete);
           check_par_domain(env, vd, rete);
           if (vd->type() == Type::varbool()) {
             vd->ti()->domain(rete);
@@ -132,7 +132,7 @@ EE flatten_id(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b,
       } else if (vd->ti()->type().structBT()) {
         auto* fieldsti = Expression::cast<ArrayLit>(vd->ti()->domain());
         std::vector<Expression*> elems(fieldsti->size());
-        for (size_t i = 0; i < fieldsti->size(); ++i) {
+        for (unsigned int i = 0; i < fieldsti->size(); ++i) {
           CallStackItem csi(env, IntLit::a(static_cast<long long int>(i)));
           auto* nti = Expression::cast<TypeInst>((*fieldsti)[i]);
           Type nty(nti->type());
@@ -209,9 +209,11 @@ EE flatten_id(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b,
       al->type(elems.empty() ? Type::bot(vd->type().dim()) : vd->type());
       vd->e(al);
       env.voAddExp(vd);
-      EE ee;
-      ee.r = vd;
-      env.cseMapInsert(vd->e(), ee);
+      if (!elems.empty()) {
+        EE ee;
+        ee.r = vd;
+        env.cseMapInsert(vd->e(), ee);
+      }
     }
     if (rete == nullptr) {
       if (!vd->toplevel()) {

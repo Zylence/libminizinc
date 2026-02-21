@@ -76,7 +76,7 @@ public:
   struct Output {
     Status status;
     std::string statusName = "Untouched";
-    double objVal = 1e100;  // need a numerical value here
+    double objVal = std::numeric_limits<double>::infinity();
     double bestBound = std::numeric_limits<double>::has_quiet_NaN
                            ? std::numeric_limits<double>::quiet_NaN()
                            : std::numeric_limits<double>::max();
@@ -151,8 +151,7 @@ public:
   CBUserInfo cbui;
 
   MIPWrapper() { cbui.wrapper = this; }
-  virtual ~MIPWrapper() { /* cleanup(); */
-  }
+  virtual ~MIPWrapper() { /* cleanup(); */ }
 
   /// derived should overload and call the ancestor
   //     virtual void cleanup() {

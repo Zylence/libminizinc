@@ -26,7 +26,8 @@ constraint z.2.1 < (z.2).2;
 constraint z.1 <-> (z.2.1 > z.2.2);
 
 % initialised
-tuple(int, var bool): init = (10, let {var bool: b} in b);
+var bool: b;
+tuple(int, var bool): init = (10, b);
 constraint init.2 <-> init.1 mod 2 == 0;
 
 % data

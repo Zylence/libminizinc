@@ -194,8 +194,8 @@ std::vector<MiniZinc::SolverConfig::ExtraFlag> MIPosicbcWrapper::getExtraFlags(
       param_default = std::to_string(param.intParameter(model));
     } else if (t <= 400) {
       auto allowed = param.definedKeywords();
-      if (allowed.size() == 2 && (allowed[0] == "on" && allowed[1] == "off" ||
-                                  allowed[0] == "off" && allowed[1] == "on")) {
+      if (allowed.size() == 2 && ((allowed[0] == "on" && allowed[1] == "off") ||
+                                  (allowed[0] == "off" && allowed[1] == "on"))) {
         param_type = MiniZinc::SolverConfig::ExtraFlag::FlagType::T_BOOL;
       } else {
         param_type = MiniZinc::SolverConfig::ExtraFlag::FlagType::T_STRING;
@@ -366,7 +366,7 @@ static CoinSighandler_t saveSignal = static_cast<CoinSighandler_t>(nullptr);
 
 extern "C" {
 void
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
     __cdecl
 #endif  // _MSC_VER
     signal_handler(int /*whichSignal*/) {

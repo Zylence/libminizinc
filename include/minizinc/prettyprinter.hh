@@ -82,14 +82,14 @@ public:
       return std::string(str);
     }
     const std::vector<std::string> reserved = {
-        "ann",   "annotation", "any",      "array",    "bool",      "case",    "constraint",
-        "diff",  "div",        "else",     "elseif",   "endif",     "enum",    "false",
-        "float", "function",   "if",       "in",       "include",   "int",     "intersect",
-        "let",   "list",       "maximize", "minimize", "mod",       "not",     "of",
-        "op",    "opt",        "output",   "par",      "predicate", "record",  "satisfy",
-        "set",   "solve",      "string",   "subset",   "superset",  "symdiff", "test",
-        "then",  "true",       "tuple",    "type",     "union",     "var",     "where",
-        "xor"};
+        "ann",       "annotation", "any",      "array",    "bool",     "case",      "constraint",
+        "default",   "diff",       "div",      "else",     "elseif",   "endif",     "enum",
+        "false",     "float",      "function", "if",       "in",       "include",   "int",
+        "intersect", "let",        "list",     "maximize", "minimize", "mod",       "not",
+        "of",        "op",         "opt",      "output",   "par",      "predicate", "record",
+        "satisfy",   "set",        "solve",    "string",   "subset",   "superset",  "symdiff",
+        "test",      "then",       "true",     "tuple",    "type",     "union",     "var",
+        "where",     "xor"};
     bool is_reserved =
         std::find(reserved.begin(), reserved.end(), std::string(str)) != reserved.end();
     int offset = str[0] == '_' ? 1 : 0;
@@ -144,6 +144,10 @@ std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Traits>& o
 }
 
 void pp_floatval(std::ostream& os, const FloatVal& fv, bool hexFloat = false);
+
+std::string show_enum_type(EnvI& env, Expression* e, Type t, bool dzn, bool json);
+
+std::string show_with_type(EnvI& env, Expression* exp, Type t, bool showDzn);
 
 }  // namespace MiniZinc
 

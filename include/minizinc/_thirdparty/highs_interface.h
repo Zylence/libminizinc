@@ -49,6 +49,7 @@ const HighsInt kHighsPresolveStatusReducedToEmpty = 4;
 const HighsInt kHighsPresolveStatusTimeout = 5;
 const HighsInt kHighsPresolveStatusNullError = 6;
 const HighsInt kHighsPresolveStatusOptionsError = 7;
+const HighsInt kHighsPresolveStatusOutOfMemory = 8;
 
 const HighsInt kHighsModelStatusNotset = 0;
 const HighsInt kHighsModelStatusLoadError = 1;
@@ -78,23 +79,17 @@ const HighsInt kHighsBasisStatusNonbasic = 4;
 const HighsInt kHighsCallbackLogging = 0;
 const HighsInt kHighsCallbackSimplexInterrupt = 1;
 const HighsInt kHighsCallbackIpmInterrupt = 2;
-const HighsInt kHighsCallbackMipImprovingSolution = 3;
-const HighsInt kHighsCallbackMipLogging = 4;
-const HighsInt kHighsCallbackMipInterrupt = 5;
+const HighsInt kHighsCallbackMipSolution = 3;
+const HighsInt kHighsCallbackMipImprovingSolution = 4;
+const HighsInt kHighsCallbackMipLogging = 5;
+const HighsInt kHighsCallbackMipInterrupt = 6;
+const HighsInt kHighsCallbackMipGetCutPool = 7;
+const HighsInt kHighsCallbackMipDefineLazyConstraints = 8;
 
-struct HighsCallbackDataOut {
-  int log_type;
-  double running_time;
-  HighsInt simplex_iteration_count;
-  HighsInt ipm_iteration_count;
-  double objective_function_value;
-  int64_t mip_node_count;
-  double mip_primal_bound;
-  double mip_dual_bound;
-  double mip_gap;
-  double* mip_solution;
-};
+const char* const kHighsCallbackDataOutObjectiveFunctionValueName = "objective_function_value";
+const char* const kHighsCallbackDataOutMipNodeCountName = "mip_node_count";
+const char* const kHighsCallbackDataOutMipDualBoundName = "mip_dual_bound";
+const char* const kHighsCallbackDataOutMipSolutionName = "mip_solution";
 
-struct HighsCallbackDataIn {
-  int user_interrupt;
-};
+typedef struct HighsCallbackDataIn HighsCallbackDataIn;
+typedef struct HighsCallbackDataOut HighsCallbackDataOut;

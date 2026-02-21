@@ -11,6 +11,11 @@
 
 #pragma once
 
+#include <minizinc/ast.hh>
+#include <minizinc/prettyprinter.hh>
+#include <minizinc/warning.hh>
+
+#include <ios>
 #include <iterator>
 #include <map>
 
@@ -23,6 +28,7 @@ private:
   bool _json;
   bool _first = true;
   std::ios _ios;
+  std::vector<std::unique_ptr<Warning>> _warnings;
   std::string _jsonType;
   std::string _prefix;
   std::string _endMarker;
@@ -119,7 +125,7 @@ public:
   ~StatisticsStream();
 
   void precision(std::streamsize prec, bool fixed = false);
-  void add(const std::string& stat, const Expression& value);
+  void add(const std::string& stat, const Expression* value);
   void add(const std::string& stat, int value);
   void add(const std::string& stat, unsigned int value);
   void add(const std::string& stat, long value);

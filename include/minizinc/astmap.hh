@@ -50,8 +50,8 @@ inline void ManagedASTStringMap<Expression*>::mark() {
   for (auto& it : *this) {
     it.first.mark();
     Expression::mark(it.second);
-#if defined(MINIZINC_GC_STATS)
-    GC::stats()[it.second->eid()].keepalive++;
+#ifdef MINIZINC_GC_STATS
+    GC::stats()[MiniZinc::Expression::eid(it.second)].keepalive++;
 #endif
   }
 }
@@ -60,8 +60,8 @@ template <>
 inline void ManagedASTStringMap<VarDeclI*>::mark() {
   for (auto& it : *this) {
     it.first.mark();
-#if defined(MINIZINC_GC_STATS)
-    GC::stats()[it.second->e()->Expression::eid()].keepalive++;
+#ifdef MINIZINC_GC_STATS
+    GC::stats()[MiniZinc::Expression::eid(it.second->e())].keepalive++;
 #endif
     Item::mark(it.second);
   }

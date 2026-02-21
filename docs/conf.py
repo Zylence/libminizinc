@@ -42,6 +42,8 @@ extensions = [
     "inlinesyntaxhighlight",
     "playground",
     "sphinxtogithub",
+    "notfound.extension",
+    'sphinx_copybutton',
 ]
 
 inline_highlight_respect_highlight = False
@@ -146,13 +148,13 @@ html_theme = "sphinx_rtd_theme"
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-html_theme_options = {
-    "logo_only": True,
-    "canonical_url": "http://www.minizinc.org/doc-latest/en/",
-    "analytics_id": os.environ.get("GOOGLE_ANALYTICS_TAG"),
-}
+html_theme_options = {"logo_only": True}
 # Add any paths that contain custom themes here, relative to this directory.
 # html_theme_path = []
+
+html_baseurl = os.environ.get(
+    "READTHEDOCS_CANONICAL_URL", "https://docs.minizinc.dev/en/stable/"
+)
 
 # The name for this set of Sphinx documents.
 # "<project> v<release> documentation" by default.
@@ -271,7 +273,7 @@ latex_elements = {
     #
     "papersize": "a4paper",
     "fontpkg": r"""
-\IfFontExistsTF{XCharter}{\setmainfont{XCharter}}{\setmainfont{Charter}}
+\setmainfont{Noto Serif}
 \setsansfont{Lato}
 \setmonofont{Inconsolata}
 """,

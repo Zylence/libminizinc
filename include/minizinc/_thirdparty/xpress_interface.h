@@ -8,7 +8,7 @@
 #else
 #define XB_CC
 #endif
-#if defined(_WIN32)
+#ifdef _WIN32
 #define XPRSint64 __int64
 #elif defined(__LP64__) || defined(_LP64) || defined(__ILP64__) || defined(_ILP64)
 #define XPRSint64 long

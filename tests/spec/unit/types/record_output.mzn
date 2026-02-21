@@ -26,7 +26,8 @@ constraint z.inner.left < z.inner.right;
 constraint z.outer <-> (z.inner.left > z.inner.right);
 
 % initialised
-record(int: x, var bool: y): init = (y: let {var bool: b} in b, x: 10);
+var bool: b;
+record(int: x, var bool: y): init = (y: b, x: 10);
 constraint init.y <-> init.x mod 2 == 0;
 
 % data

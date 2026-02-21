@@ -254,7 +254,7 @@ Solutions end with a sequence of ten dashes followed by a newline.
   :start-after: % Unsatisfiable
   :end-before: %
 
-The completness result is printed on a separate line.
+The completeness result is printed on a separate line.
 *Rationale: The strings are designed to clearly indicate
 the end of the solutions.*
 
@@ -868,7 +868,7 @@ Some example set type-inst expressions:
 |TyFiniteType|
 Yes, if the set elements are finite types.  Otherwise, no.
 
-The domain of a set type that is a finite type is the powerset of the domain
+The domain of a set type that is a finite type is the power set of the domain
 of its element type.  For example, the domain of :mzn:`set of 1..2` is
 :mzn:`powerset(1..2)`, which is :mzn:`{}, {1}, {1,2}, {2}`.
 
@@ -1354,7 +1354,7 @@ the :mzn:`not`) and so the annotation binds to the whole application.
 
 Expressions can be contained within parentheses.
 
-The array access operations
+The array and field access operations
 all bind more tightly than unary and binary operators and annotations.  
 They are described in more detail in :ref:`spec-Array-Access-Expressions`.
 
@@ -1447,53 +1447,57 @@ Note that the last entry in the table, :mzn:`^-1`, is a combination of the binar
   ===============================  ====== ======
   Symbol(s)                        Assoc. Prec. 
   ===============================  ====== ======
-  :mzn:`<->`                       left   1200  
+  :mzn:`<->`                       left   1600  
 
-  :mzn:`->`                        left   1100  
-  :mzn:`<-`                        left   1100  
+  :mzn:`->`                        left   1500  
+  :mzn:`<-`                        left   1500  
 
-  ``\/``                           left   1000  
-  :mzn:`xor`                       left   1000  
+  ``\/``                           left   1400  
+  :mzn:`xor`                       left   1400  
 
-  ``/\``                           left   900   
+  ``/\``                           left   1300   
 
-  :mzn:`<`                         none   800   
-  :mzn:`>`                         none   800   
-  :mzn:`<=`                        none   800   
-  :mzn:`>=`                        none   800   
-  :mzn:`==`,                   
-  :mzn:`=`                         none   800   
-  :mzn:`!=`                        none   800   
+  :mzn:`<`                         none   1200   
+  :mzn:`>`                         none   1200   
+  :mzn:`<=`                        none   1200   
+  :mzn:`>=`                        none   1200   
+  
+  :mzn:`==`                        none   1100
+  :mzn:`=`                         none   1100   
+  :mzn:`!=`                        none   1100   
                              
-  :mzn:`in`                        none   700   
-  :mzn:`subset`                    none   700   
-  :mzn:`superset`                  none   700   
-                             
-  :mzn:`union`                     left   600   
-  :mzn:`diff`                      left   600   
-  :mzn:`symdiff`                   left   600   
-                             
-  :mzn:`..`                        none   500   
-  :mzn:`<..`                       none   500   
-  :mzn:`..<`                       none   500   
-  :mzn:`<..<`                      none   500   
-                             
-  :mzn:`+`                         left   400   
-  :mzn:`-`                         left   400   
-                             
-  :mzn:`*`                         left   300   
-  :mzn:`div`                       left   300   
-  :mzn:`mod`                       left   300   
-  :mzn:`/`                         left   300   
-  :mzn:`intersect`                 left   300   
+  :mzn:`in`                        none   1000   
+  :mzn:`subset`                    none   1000   
+  :mzn:`superset`                  none   1000   
 
-  :mzn:`^`                         left   200
+  :mzn:`union`                     left    900   
+  :mzn:`diff`                      left    900   
+  :mzn:`symdiff`                   left    900   
+
+  :mzn:`intersect`                 left    800
+                           
+  :mzn:`..`                        none    700   
+  :mzn:`<..`                       none    700   
+  :mzn:`..<`                       none    700   
+  :mzn:`<..<`                      none    700   
                              
-  :mzn:`++`                        right  100   
+  :mzn:`+`                         left    600   
+  :mzn:`-`                         left    600   
+                             
+  :mzn:`*`                         left    500   
+  :mzn:`div`                       left    500   
+  :mzn:`mod`                       left    500   
+  :mzn:`/`                         left    500   
+  
+  :mzn:`^`                         left    400
+                             
+  :mzn:`++`                        right   300   
 
-  :mzn:`default`                   left    70
+  :mzn:`default`                   left    200
 
-  `````  :mzndef:`<ident>` `````   left    50   
+  `````  :mzndef:`<ident>` `````   left    100
+
+  :mzn:`::`                        left      0 
   ===============================  ====== ======
 
 
@@ -1508,6 +1512,11 @@ This is a static error if the identifier is not the name of a binary
 function or predicate.
 
 The unary operators are: :mzn:`+`, :mzn:`-` and :mzn:`not`.
+Unary :mzn:`+` and :mzn:`-` have the same precedence as the binary
+multiplication operator :mzn:`*`. The logic :mzn:`not` operator
+has precedence 350, i.e., it binds more tightly than all other
+Boolean and numeric operators.
+
 User-defined unary operators are not possible.
 
 As :ref:`spec-Identifiers` explains, any built-in operator can be used as
@@ -1646,7 +1655,8 @@ concatenation.  For example:
 
 A string expression can contain an arbitrary MiniZinc expression, which will
 be converted to a string similar to the builtin :mzn:`show` function and
-inserted into the string.
+inserted into the string. This is called *string interpolation*. You need
+to use the :mzn:`\(e)` syntax to interpolate an expression `e` into a string.
 
 For example:
 
@@ -2078,6 +2088,47 @@ In addition to the :mzn:`..` operator, you can also use the :mzn:`<..`, :mzn:`..
    % x2 = x[B..C, 3..3]
    array[_, _] of var int: x2 = x[<..<, 2<..];
 
+Record and Tuple Field Access Expressions
++++++++++++++++++++++++++++++++++++++++++
+
+Fields of records and tuples are accessed using a dot after an expression:
+
+.. literalinclude:: grammar.mzn
+  :language: minizincdef
+  :start-after: % Field access
+  :end-before: %
+
+For example:
+
+.. code-block:: minizinc
+
+    record(int:a, string: n): r = (a: 3, n: "foo");
+    int: x = r.a;
+    string: y = r.n;
+
+    tuple(float, bool): t = (42.0, true);
+    float: f = t.1;
+    bool: b = t.2;
+
+The type-inst of the result is the type-inst of the field.
+
+Field access can be chained, for example:
+
+.. code-block:: minizinc
+
+    record(record(int:a, string:n): r1, bool: b): r2 = 
+        (r1: (a: 3, n: "foo"), b: true);
+    int: x = r2.r1.a;
+
+Field access syntax can be used to project fields from arrays of records or tuples. For example:
+
+.. code-block:: minizinc
+
+    array[1..3] of record(int:a, string:n): r_array = 
+        [ (a: 1, n: "one"), (a: 2, n: "two"), (a: 3, n: "three") ];
+    array[1..3] of int: a_array = r_array.a;
+    array[1..3] of string: n_array = r_array.n;
+
 Annotation Literals
 +++++++++++++++++++
 
@@ -2135,6 +2186,14 @@ and then only one of the :mzn:`then` and :mzn:`else` branches are evaluated,
 depending on whether the condition succeeded or failed. 
 This is not the case if it is :mzn:`var bool`.
 
+The :mzn:`else` branch is optional if the type of the :mzn:`then` branches is
+:mzn:`bool`, :mzn:`string`, :mzn:`ann` or an :mzn:`array` type. In that case,
+the :mzn:`else` branch is taken to be the default value of the type:
+
+- :mzn:`false` for :mzn:`bool`
+- :mzn:`""` for :mzn:`string`
+- :mzn:`empty_annotation` for :mzn:`ann`
+- :mzn:`[]` for :mzn:`array`
 
 .. _spec-let-expressions:
 
@@ -2195,7 +2254,7 @@ is a decision variable.  For example:
     let { var int: x; } in ...;    % ok
     let {     int: x; } in ...;    % illegal
 
-For let local variables with initialisers, the type-inst can be ommitted by using
+For let local variables with initialisers, the type-inst can be omitted by using
 the :mzn:`any` keyword, in which case the type-inst is inferred from the initialiser:
 
 .. code-block:: minizinc
@@ -2460,13 +2519,22 @@ The same enum constructor syntax also works with integer sets, for example
 
 declares an enum for nodes in a bipartite graph with :mzn:`n` left nodes and :mzn:`n` right nodes.
 
+The enum constructor can also be used without arguments to return the set of values of the particular constructor. For example, given a :mzn:`Node: n`, we can use the syntax `n in Left()` to test if :mzn:`n` is in the :mzn:`Left` set.
+
 Enum constructors can be used to map non-contiguous sets to (contiguous) enumerated types. Consider the following example:
 
 .. code-block:: minizinc
 
     enum Person = { Amy, Bert, Celeste, Doug, Emely };
     enum Staff = S({Amy, Doug});
-    enum Customers = S(Person setminus S⁻¹(Staff));
+    enum Customers = C(Person diff S⁻¹(Staff));
+
+An enum constructor and its inverse can be applied to sets and arrays of enum values as well:
+
+.. code-block:: minizinc
+
+    array[int] of Customers: custs = S([Bert])
+    array[int] of Person: custs_as_people = C⁻¹(custs);
 
 An enum can be declared but not defined, in which case it must be defined
 elsewhere within the model, or in a data file.
@@ -2531,6 +2599,10 @@ For each enumerated type :mzn:`T`, the following functions exist:
   function set of T: enum_of(var T: x);
   function set of T: enum_of(set of T: x);
   function set of T: enum_of(var set of T: x);
+
+  % Convert enum type x to an integer
+  function int: enum2int(T: x);
+  function var int: enum2int(var T: x);
 
   % Convert x to enum type X
   function T: to_enum(set of T: X, int: x);
@@ -2723,7 +2795,7 @@ User-defined Operations
 .. 
   % XXX: not saying if operations need to be defined.  Implementation
   % currently requires functions and tests to be defined if used, but
-  % predicates can be bodyless even if used.  Should perhaps require functions
+  % predicates can be bodiless even if used.  Should perhaps require functions
   % to be defined even if they're not used (like parameters), and make tests
   % like predicates?
 
@@ -3950,6 +4022,8 @@ as JSON objects. A JSON input file needs to have the following structure:
   - A value of an enumerated type encoded as an object with a single member with key ``"e"`` and a string value (the identifier of the enumerated value).
 
   - The value of an enumerated type constructor call encoded as an object with a member with key ``"c"`` and a string value (the identifier of the constructor call), and a member with key ``"e"`` and a enumerated type (or constructor) object value (the argument to the call).
+
+  - A list of enum constructors used to define the members of an enumerated type. Each constructor is either a string value for an atomic enum value, or an object with members ``"c"`` and ``"e"`` as above for a constructor call.
 
 MiniZinc supports coercion of some JSON input types for more convenient input:
 

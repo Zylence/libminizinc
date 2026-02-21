@@ -25,7 +25,7 @@ namespace {
 bool is_completely_par(EnvI& env, FunctionI* fi, const std::vector<Type>& tv) {
   if (fi->e() != nullptr) {
     // This is not a builtin, so check parameters
-    for (int i = 0; i < fi->paramCount(); i++) {
+    for (unsigned int i = 0; i < fi->paramCount(); i++) {
       if (fi->param(i)->type().isvar() && !fi->param(i)->type().any()) {
         return false;
       }
@@ -170,6 +170,20 @@ bool cannot_use_rhs_for_output(EnvI& env, Expression* e,
               rt.mkPar(env);
               decl->ti()->type(rt);
 
+              class MakeBodyPar : public EVisitor {
+              public:
+                EnvI& env;
+                MakeBodyPar(EnvI& env0) : env(env0) {}
+                bool enter(Expression* e) {
+                  Type t(Expression::type(e));
+                  t.mkPar(env);
+                  t.cv(false);
+                  Expression::type(e, t);
+                  return true;
+                }
+              } _mbp(env);
+              top_down(_mbp, decl->e());
+
               CollectOccurrencesE ce(env, env.outputVarOccurrences, decl);
               top_down(ce, decl->e());
               top_down(ce, decl->ti());
@@ -223,7 +237,7 @@ bool rhs_contains_var_comp(EnvI& env, Expression* e) {
     void vArrayAccess(const ArrayAccess* /*aa*/) {}
     /// Visit array comprehension
     void vComprehension(const Comprehension* c) {
-      for (int i = 0; i < c->numberOfGenerators(); i++) {
+      for (unsigned int i = 0; i < c->numberOfGenerators(); i++) {
         const auto* g_in = c->in(i);
         if (g_in != nullptr) {
           const Type& ty_in = Expression::type(g_in);
@@ -441,12 +455,18 @@ Call* generate_show(EnvI& env, Expression* e, Expression* w, Expression* p, bool
 
   if (t.bt() == Type::BT_TUPLE) {
     auto* tt = env.getTupleType(t);
+    if (tt->size() == 2 && (*tt)[1].isunknown()) {
+      auto field_type = (*tt)[0];
+      auto* field_access = new FieldAccess(Location().introduce(), e, IntLit::a(1LL));
+      Expression::type(field_access, field_type);
+      return generate_show(env, field_access, w, p, show_dzn, is_json);
+    }
     std::vector<Expression*> shown_fields(tt->size() == 1 && !is_json ? 4 : tt->size() * 2 + 1,
                                           tt->size() == 1
                                               ? new StringLit(Location().introduce(), ",")
                                               : new StringLit(Location().introduce(), ", "));
     bool canUseBuiltin = true;
-    for (size_t i = 0; i < tt->size(); i++) {
+    for (unsigned int i = 0; i < tt->size(); i++) {
       auto field_type = (*tt)[i];
       auto* field_access =
           new FieldAccess(Location().introduce(), e, IntLit::a(static_cast<long long int>(i + 1)));
@@ -483,7 +503,7 @@ Call* generate_show(EnvI& env, Expression* e, Expression* w, Expression* p, bool
     auto* rt = env.getRecordType(t);
     std::vector<Expression*> shown_fields(rt->size() * 2 + 2);
     bool canUseBuiltin = true;
-    for (size_t i = 0; i < rt->size(); i++) {
+    for (unsigned int i = 0; i < rt->size(); i++) {
       auto field_name = rt->fieldName(i);
       auto field_type = (*rt)[i];
       auto* field_access =
@@ -759,7 +779,7 @@ public:
         case Expression::E_ITE: {
           ITE* ite = Expression::cast<ITE>(e);
           stack.push_back(ite->elseExpr());
-          for (int i = 0; i < ite->size(); i++) {
+          for (unsigned int i = 0; i < ite->size(); i++) {
             stack.push_back(ite->ifExpr(i));
             stack.push_back(ite->thenExpr(i));
           }
@@ -833,9 +853,9 @@ void output_vardecls(EnvI& env, Item* ci, Expression* e) {
         ClearAnnotations::run(nvi->e());
         nvi->e()->introduced(false);
         if (reallyFlat != nullptr) {
-          env.outputFlatVarOccurrences.addIndex(reallyFlat, static_cast<int>(env.output->size()));
+          env.outputFlatVarOccurrences.addIndex(reallyFlat, env.output->size());
         }
-        env.outputVarOccurrences.addIndex(nvi, static_cast<int>(env.output->size()));
+        env.outputVarOccurrences.addIndex(nvi, env.output->size());
         env.outputVarOccurrences.add(nvi->e(), ci);
         env.output->addItem(nvi);
 
@@ -1030,7 +1050,7 @@ Expression* create_dzn_output(EnvI& e, bool includeObjective, bool includeOutput
             Comprehension* indexes;
             Comprehension* values;
             auto* index_set = Call::a(Location().introduce(), "index_set", {vd->id()});
-            index_set->type(Type::varsetint());
+            index_set->type(Type::parsetint());
             index_set->decl(e.model->matchFn(e, index_set, false));
 
             {
@@ -1064,7 +1084,17 @@ Expression* create_dzn_output(EnvI& e, bool includeObjective, bool includeOutput
               vd_t.typeId(xEnumId);
               aa->type(vd_t);
 
-              auto* show_i = Call::a(Location().introduce(), ASTString("showDzn"), {aa});
+              Expression* aa_e = aa;
+              if (vd_t.istuple()) {
+                auto* tupleType = e.getTupleType(vd_t);
+                if (tupleType->size() == 2 && (*tupleType)[1].isunknown()) {
+                  // Yes: insert field access
+                  aa_e = new FieldAccess(Expression::loc(aa).introduce(), aa, IntLit::a(1));
+                  Expression::type(aa_e, (*tupleType)[0]);
+                }
+              }
+
+              auto* show_i = Call::a(Location().introduce(), ASTString("showDzn"), {aa_e});
               show_i->type(Type::parstring());
               FunctionI* fi = e.model->matchFn(e, show_i, false);
               assert(fi);
@@ -1174,7 +1204,17 @@ Expression* create_dzn_output(EnvI& e, bool includeObjective, bool includeOutput
               vd_t.typeId(xEnumId);
               aa->type(vd_t);
 
-              auto* show_i = Call::a(Location().introduce(), ASTString("showDzn"), {aa});
+              Expression* aa_e = aa;
+              if (vd_t.istuple()) {
+                auto* tupleType = e.getTupleType(vd_t);
+                if (tupleType->size() == 2 && (*tupleType)[1].isunknown()) {
+                  // Yes: insert field access
+                  aa_e = new FieldAccess(Expression::loc(aa).introduce(), aa, IntLit::a(1));
+                  Expression::type(aa_e, (*tupleType)[0]);
+                }
+              }
+
+              auto* show_i = Call::a(Location().introduce(), ASTString("showDzn"), {aa_e});
               show_i->type(Type::parstring());
               FunctionI* fi = e.model->matchFn(e, show_i, false);
               assert(fi);
@@ -1252,7 +1292,7 @@ Expression* create_dzn_output(EnvI& e, bool includeObjective, bool includeOutput
 
               auto* toStringMin =
                   Call::a(Location().introduce(), toString,
-                          {IntLit::a(idxMin), e.constants.literalFalse, e.constants.literalFalse});
+                          {IntLit::a(idxMin), e.constants.literalTrue, e.constants.literalFalse});
               toStringMin->type(Type::parstring());
               FunctionI* toStringMin_fi = e.model->matchFn(e, toStringMin, false);
               toStringMin->decl(toStringMin_fi);
@@ -1263,7 +1303,7 @@ Expression* create_dzn_output(EnvI& e, bool includeObjective, bool includeOutput
 
               auto* toStringMax =
                   Call::a(Location().introduce(), toString,
-                          {IntLit::a(idxMax), e.constants.literalFalse, e.constants.literalFalse});
+                          {IntLit::a(idxMax), e.constants.literalTrue, e.constants.literalFalse});
               toStringMax->type(Type::parstring());
               FunctionI* toStringMax_fi = e.model->matchFn(e, toStringMax, false);
               toStringMax->decl(toStringMax_fi);
@@ -1384,8 +1424,7 @@ ArrayLit* create_json_output(EnvI& e, bool includeObjective, bool includeOutputI
     } else {
       s << ",\n";
     }
-    s << "  \"" << Printer::escapeStringLit(vd->id()->str()) << "\""
-      << " : ";
+    s << "  \"" << Printer::escapeStringLit(vd->id()->str()) << "\"" << " : ";
     auto* sl = new StringLit(Location().introduce(), s.str());
     outputVars.push_back(sl);
 
@@ -1408,8 +1447,7 @@ ArrayLit* create_json_output(EnvI& e, bool includeObjective, bool includeOutputI
       } else {
         s << ",\n";
       }
-      s << "  \"_output\""
-        << " : ";
+      s << "  \"_output\"" << " : ";
       auto* sl = new StringLit(Location().introduce(), s.str());
       outputVars.push_back(sl);
       Call* concat = Call::a(Location().introduce(), ASTString("concat"), {oi->e()});
@@ -1435,8 +1473,7 @@ ArrayLit* create_json_output(EnvI& e, bool includeObjective, bool includeOutputI
     } else {
       s << ",\n";
     }
-    s << "  \"_checker\""
-      << " : ";
+    s << "  \"_checker\"" << " : ";
     auto* sl = new StringLit(Location().introduce(), s.str());
     outputVars.push_back(sl);
     Call* checker_output = Call::a(Location().introduce(), ASTString("showCheckerOutput"), {});
@@ -1514,7 +1551,7 @@ void process_toplevel_output_vars(EnvI& e) {
                      e.model->filename().endsWith(".mzc.mzn")) {}
 
     bool hasAddToOutput = false;
-    std::vector<std::pair<int, VarDecl*>> todo;
+    std::vector<std::pair<size_t, VarDecl*>> todo;
 
     void vVarDeclI(VarDeclI* vdi) {
       auto* vd = vdi->e();
@@ -1546,7 +1583,7 @@ void process_toplevel_output_vars(EnvI& e) {
     // Insert implicit output variables
     int inserted = 0;
     for (auto& it : ovv.todo) {
-      auto idx = it.first;
+      int idx = static_cast<int>(it.first);
       auto* vd = it.second;
       if (Expression::ann(vd).contains(e.constants.ann.no_output) || Expression::type(vd).isPar()) {
         continue;
@@ -1577,17 +1614,26 @@ void create_output(EnvI& e, FlatteningOptions::OutputMode outputMode, bool outpu
   OutputI* outputItem = nullptr;
   GCLock lock;
 
+  // Let items to ensure output with side effects is only evaluated once
+  std::vector<Expression*> let_items;
+
   // Combine output sections into one string
   bool generateDefault = e.outputSections.noUserDefined();
   Expression* o = nullptr;
-  for (const auto& it : e.outputSections) {
+  for (auto& it : e.outputSections) {
     if (!e.outputSectionEnabled(it.section)) {
       continue;
     }
+    ASTExprVec<TypeInst> r({new TypeInst(Location().introduce(), Type::parint())});
+    auto* ti = new TypeInst(Location().introduce(), Expression::type(it.e), r);
+    auto* vd = new VarDecl(Location().introduce(), ti, e.genId(), it.e);
+    vd->toplevel(false);
+    it.e = vd->id();
+    let_items.push_back(vd);
     if (o == nullptr) {
-      o = it.e;
+      o = vd->id();
     } else {
-      o = new BinOp(Location().introduce(), o, BOT_PLUSPLUS, it.e);
+      o = new BinOp(Location().introduce(), o, BOT_PLUSPLUS, vd->id());
       Expression::type(o, Type::parstring(1));
     }
   }
@@ -1636,6 +1682,10 @@ void create_output(EnvI& e, FlatteningOptions::OutputMode outputMode, bool outpu
   if (o == nullptr) {
     // All sections disabled
     o = new ArrayLit(Location().introduce(), std::vector<Expression*>());
+    Expression::type(o, Type::parstring(1));
+  }
+  if (!let_items.empty()) {
+    o = new Let(Location().introduce(), let_items, o);
     Expression::type(o, Type::parstring(1));
   }
   auto* newOutputItem = new OutputI(Location().introduce(), o);
@@ -1815,7 +1865,11 @@ void create_output(EnvI& e, FlatteningOptions::OutputMode outputMode, bool outpu
                   Expression::addAnnotation(vd_followed->flat(), env.constants.ann.output_var);
                   check_rename_var(env, vd_followed, {}, 0);
                 } else {
-                  bool needOutputAnn = true;
+                  // We need to create an output annotation for the FlatZinc decl,
+                  // but only if it is NOT an optional type (those can't be output),
+                  // and if none of the contents of its array literal (if present)
+                  // has a reverse mapper.
+                  bool needOutputAnn = !reallyFlat->type().isOpt();
                   if (auto* al = Expression::dynamicCast<ArrayLit>(reallyFlat->e())) {
                     for (unsigned int i = 0; i < al->size(); i++) {
                       if (Id* id = Expression::dynamicCast<Id>((*al)[i])) {
@@ -1882,8 +1936,7 @@ void create_output(EnvI& e, FlatteningOptions::OutputMode outputMode, bool outpu
               }
             }
             if ((reallyFlat != nullptr) && env.outputFlatVarOccurrences.find(reallyFlat) == -1) {
-              env.outputFlatVarOccurrences.addIndex(reallyFlat,
-                                                    static_cast<int>(env.output->size()));
+              env.outputFlatVarOccurrences.addIndex(reallyFlat, env.output->size());
             }
           }
         } else {
@@ -1896,7 +1949,7 @@ void create_output(EnvI& e, FlatteningOptions::OutputMode outputMode, bool outpu
           }
         }
         make_par(env, vdi_copy->e());
-        env.outputVarOccurrences.addIndex(vdi_copy, static_cast<int>(env.output->size()));
+        env.outputVarOccurrences.addIndex(vdi_copy, env.output->size());
         CollectOccurrencesE ce(env, env.outputVarOccurrences, vdi_copy);
         top_down(ce, vdi_copy->e());
         env.output->addItem(vdi_copy);
@@ -2011,7 +2064,7 @@ void finalise_output(EnvI& e) {
                 if (e.varOccurrences.occurrences(reallyFlat) == 0 && reallyFlat->e() == nullptr) {
                   auto it = e.varOccurrences.idx.find(reallyFlat->id());
                   assert(it.first);
-                  e.flatRemoveItem((*e.flat())[*it.second]->cast<VarDeclI>());
+                  e.flatRemoveItem((*e.flat())[*it.second] -> cast<VarDeclI>());
                 }
               } else {
                 // If the VarDecl does not have a usable right hand side, it needs to be
@@ -2035,7 +2088,7 @@ void finalise_output(EnvI& e) {
                     if (e.varOccurrences.occurrences(reallyFlat) == 0) {
                       auto it = e.varOccurrences.idx.find(reallyFlat->id());
                       assert(it.first);
-                      e.flatRemoveItem((*e.flat())[*it.second]->cast<VarDeclI>());
+                      e.flatRemoveItem((*e.flat())[*it.second] -> cast<VarDeclI>());
                     }
                   }
                 } else if (auto* al = Expression::dynamicCast<ArrayLit>(reallyFlat->e())) {
@@ -2054,7 +2107,7 @@ void finalise_output(EnvI& e) {
                     if (e.varOccurrences.occurrences(reallyFlat) == 0) {
                       auto it = e.varOccurrences.idx.find(reallyFlat->id());
                       assert(it.first);
-                      e.flatRemoveItem((*e.flat())[*it.second]->cast<VarDeclI>());
+                      e.flatRemoveItem((*e.flat())[*it.second] -> cast<VarDeclI>());
                     }
                     vd->e(copy(e, e.cmap, al));
                     Type al_t(Expression::type(vd->e()));
@@ -2125,7 +2178,7 @@ void finalise_output(EnvI& e) {
             vd->type(vdt);
             vd->ti()->type(vdt);
           }
-          e.outputVarOccurrences.addIndex(item->cast<VarDeclI>(), static_cast<int>(i));
+          e.outputVarOccurrences.addIndex(item->cast<VarDeclI>(), i);
           CollectOccurrencesE ce(e, e.outputVarOccurrences, item);
           top_down(ce, vd);
         } break;

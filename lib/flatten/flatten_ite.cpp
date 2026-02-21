@@ -89,7 +89,7 @@ Expression* ite_struct_split(EnvI& env, Type ty, const std::vector<Expression*>&
                   env.genId(), else_in);
   else_decl->ti()->setStructDomain(env, Expression::type(else_in));
 
-  for (int i = 0; i < st->size(); ++i) {
+  for (unsigned int i = 0; i < st->size(); ++i) {
     Type field = (*st)[i];
     if (field.structBT()) {
       std::vector<Expression*> f_then_in(then_decl.size());
@@ -100,6 +100,7 @@ Expression* ite_struct_split(EnvI& env, Type ty, const std::vector<Expression*>&
       }
       Expression* f_else_in =
           new FieldAccess(Location().introduce(), else_decl->id(), IntLit::a(i + 1));
+      Expression::type(f_else_in, field);
       tupleResult[i] = ite_struct_split(env, field, f_then_in, f_else_in, results, e_then, e_else);
     } else {
       VarDecl* fieldRes =
@@ -164,7 +165,7 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
     IdMap<int> eq_occurrences;
     std::vector<IdMap<std::pair<Expression*, Expression*>>> eq_branches(ite->size() + 1);
     std::vector<std::vector<Expression*>> other_branches(ite->size() + 1);
-    for (int i = 0; i < ite->size(); i++) {
+    for (unsigned int i = 0; i < ite->size(); i++) {
       auto conjuncts = get_conjuncts(ite->thenExpr(i));
       for (auto* c : conjuncts) {
         classify_conjunct(env, c, eq_occurrences, eq_branches[i], other_branches[i]);
@@ -180,11 +181,11 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
       noOtherBranches = noOtherBranches && other_branches[ite->size()].empty();
     }
     for (auto& eq : eq_occurrences) {
-      if (eq.second >= ite->size()) {
+      if (eq.second >= static_cast<int>(ite->size())) {
         // Any identifier that occurs in all or all but one branch gets its own conditional
         results.emplace_back(eq.first->decl());
         e_then.emplace_back();
-        for (int i = 0; i < ite->size(); i++) {
+        for (unsigned int i = 0; i < ite->size(); i++) {
           auto it = eq_branches[i].find(eq.first);
           if (it == eq_branches[i].end()) {
             // not found, simply push x=x
@@ -204,7 +205,7 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
         }
       } else {
         // All other identifiers are put in the vector of "other" branches
-        for (int i = 0; i <= ite->size(); i++) {
+        for (unsigned int i = 0; i <= ite->size(); i++) {
           auto it = eq_branches[i].find(eq.first);
           if (it != eq_branches[i].end()) {
             other_branches[i].push_back(it->second.second);
@@ -217,7 +218,7 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
     if (!noOtherBranches) {
       results.emplace_back(r);
       e_then.emplace_back();
-      for (int i = 0; i < ite->size(); i++) {
+      for (unsigned int i = 0; i < ite->size(); i++) {
         if (eq_branches[i].empty()) {
           e_then.back().emplace_back(ite->thenExpr(i));
         } else if (other_branches[i].empty()) {
@@ -255,7 +256,7 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
   } else if (ite->type().istuple() || ite->type().isrecord()) {
     noOtherBranches = false;
     std::vector<Expression*> then_in(ite->size());
-    for (size_t i = 0; i < ite->size(); ++i) {
+    for (unsigned int i = 0; i < ite->size(); ++i) {
       then_in[i] = ite->thenExpr(i);
     }
     tupleResult =
@@ -264,7 +265,7 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
     noOtherBranches = false;
     results.emplace_back(r);
     e_then.emplace_back();
-    for (int i = 0; i < ite->size(); i++) {
+    for (unsigned int i = 0; i < ite->size(); i++) {
       e_then.back().emplace_back(ite->thenExpr(i));
     }
     e_else.emplace_back(ite->elseExpr());
@@ -291,18 +292,13 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
   cmix.neg = ctx.neg;
 
   bool foundTrueBranch = false;
-  for (int i = 0; i < ite->size() && !foundTrueBranch; i++) {
+  for (unsigned int i = 0; i < ite->size() && !foundTrueBranch; i++) {
     bool cond = true;
     EE e_if;
-    if (Expression::isa<Call>(ite->ifExpr(i)) &&
-        Expression::cast<Call>(ite->ifExpr(i))->id() == env.constants.ids.mzn_in_root_context) {
-      e_if = EE(env.constants.boollit(ctx.b == C_ROOT), env.constants.literalTrue);
-    } else {
-      Ctx cmix_not_negated;
-      cmix_not_negated.b = C_MIX;
-      cmix_not_negated.i = C_MIX;
-      e_if = flat_exp(env, cmix_not_negated, ite->ifExpr(i), nullptr, env.constants.varTrue);
-    }
+    Ctx cmix_not_negated;
+    cmix_not_negated.b = C_MIX;
+    cmix_not_negated.i = C_MIX;
+    e_if = flat_exp(env, cmix_not_negated, ite->ifExpr(i), nullptr, env.constants.varTrue);
     if (Expression::type(e_if.r()) == Type::parbool()) {
       {
         GCLock lock;
@@ -444,29 +440,20 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
   for (unsigned int j = 0; j < results.size(); j++) {
     auto* nr = Expression::cast<VarDecl>(results[j]());
     GCLock lock;
-    if (r_bounds_valid_int[j] && ite->type().isint()) {
+    if (r_bounds_valid_int[j] && nr->type().isint()) {
       IntVal lb = IntVal::infinity();
       IntVal ub = -IntVal::infinity();
       for (auto& i : r_bounds_int[j]) {
         lb = std::min(lb, i.l);
         ub = std::max(ub, i.u);
       }
-      if (nr->ti()->domain() != nullptr) {
-        IntSetVal* isv = eval_intset(env, nr->ti()->domain());
-        Ranges::Const<IntVal> ite_r(lb, ub);
-        IntSetRanges isv_r(isv);
-        Ranges::Inter<IntVal, Ranges::Const<IntVal>, IntSetRanges> inter(ite_r, isv_r);
-        IntSetVal* isv_new = IntSetVal::ai(inter);
-        if (!isv_new->equal(isv)) {
-          auto* r_dom = new SetLit(Location().introduce(), isv_new);
-          nr->ti()->domain(r_dom);
-        }
-      } else {
-        auto* r_dom = new SetLit(Location().introduce(), IntSetVal::a(lb, ub));
-        nr->ti()->domain(r_dom);
-        nr->ti()->setComputedDomain(true);
+      if (lb.isFinite() || ub.isFinite()) {
+        auto* nr_in = new BinOp(Location().introduce(), nr->id(), BOT_IN,
+                                new SetLit(Location().introduce(), IntSetVal::a(lb, ub)));
+        nr_in->type(Type::varbool());
+        (void)flat_exp(env, Ctx(), nr_in, env.constants.varTrue, env.constants.varTrue);
       }
-    } else if (r_bounds_valid_set[j] && ite->type().isIntSet()) {
+    } else if (r_bounds_valid_set[j] && nr->type().isIntSet()) {
       IntSetVal* isv_branches = IntSetVal::a();
       for (auto& i : r_bounds_set[j]) {
         IntSetRanges i0(isv_branches);
@@ -474,40 +461,24 @@ EE flatten_ite(EnvI& env, const Ctx& ctx, Expression* e, VarDecl* r, VarDecl* b)
         Ranges::Union<IntVal, IntSetRanges, IntSetRanges> u(i0, i1);
         isv_branches = IntSetVal::ai(u);
       }
-      if (nr->ti()->domain() != nullptr) {
-        IntSetVal* isv = eval_intset(env, nr->ti()->domain());
-        IntSetRanges isv_r(isv);
-        IntSetRanges isv_branches_r(isv_branches);
-        Ranges::Inter<IntVal, IntSetRanges, IntSetRanges> inter(isv_branches_r, isv_r);
-        IntSetVal* isv_new = IntSetVal::ai(inter);
-        if (!isv_new->equal(isv)) {
-          auto* r_dom = new SetLit(Location().introduce(), isv_new);
-          nr->ti()->domain(r_dom);
-        }
-      } else {
-        auto* r_dom = new SetLit(Location().introduce(), isv_branches);
-        nr->ti()->domain(r_dom);
-        nr->ti()->setComputedDomain(true);
+      if (isv_branches->min().isFinite() || isv_branches->max().isFinite()) {
+        auto* nr_in = new BinOp(Location().introduce(), nr->id(), BOT_SUBSET,
+                                new SetLit(Location().introduce(), isv_branches));
+        nr_in->type(Type::varbool());
+        (void)flat_exp(env, Ctx(), nr_in, env.constants.varTrue, env.constants.varTrue);
       }
-    } else if (r_bounds_valid_float[j] && ite->type().isfloat()) {
+    } else if (r_bounds_valid_float[j] && nr->type().isfloat()) {
       FloatVal lb = FloatVal::infinity();
       FloatVal ub = -FloatVal::infinity();
       for (auto& i : r_bounds_float[j]) {
         lb = std::min(lb, i.l);
         ub = std::max(ub, i.u);
       }
-      if (nr->ti()->domain() != nullptr) {
-        FloatSetVal* isv = eval_floatset(env, nr->ti()->domain());
-        Ranges::Const<FloatVal> ite_r(lb, ub);
-        FloatSetRanges isv_r(isv);
-        Ranges::Inter<FloatVal, Ranges::Const<FloatVal>, FloatSetRanges> inter(ite_r, isv_r);
-        FloatSetVal* fsv_new = FloatSetVal::ai(inter);
-        auto* r_dom = new SetLit(Location().introduce(), fsv_new);
-        nr->ti()->domain(r_dom);
-      } else {
-        auto* r_dom = new SetLit(Location().introduce(), FloatSetVal::a(lb, ub));
-        nr->ti()->domain(r_dom);
-        nr->ti()->setComputedDomain(true);
+      if (lb.isFinite() || ub.isFinite()) {
+        auto* nr_in = new BinOp(Location().introduce(), nr->id(), BOT_IN,
+                                new SetLit(Location().introduce(), FloatSetVal::a(lb, ub)));
+        nr_in->type(Type::varbool());
+        (void)flat_exp(env, Ctx(), nr_in, env.constants.varTrue, env.constants.varTrue);
       }
     }
   }

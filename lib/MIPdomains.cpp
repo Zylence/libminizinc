@@ -780,7 +780,7 @@ private:
                 ++MIPD_stats[fIntLinEq ? N_POSTs_eq2intlineq : N_POSTs_eq2floatlineq];
               }
             }
-          }       /// case with just 1 variable: else if (al->size() == 1) { }
+          }  /// case with just 1 variable: else if (al->size() == 1) { }
           else {  // larger eqns
             auto* eVD = get_annotation(Expression::ann(c), Constants::constants().ann.defines_var);
             if (eVD != nullptr) {
@@ -827,7 +827,7 @@ private:
 
   /// This vector stores the linear part of a general view
   /// x = <linear part> + rhs
-  typedef std::vector<std::pair<VarDecl*, float> > TLinExpLin;
+  typedef std::vector<std::pair<VarDecl*, double> > TLinExpLin;
   /// This struct has data describing the rest of a general view
   struct NViewData {
     VarDecl* pVarDefined = nullptr;
@@ -879,7 +879,7 @@ private:
     nVRest.coef0 /= coef1;
     nVRest.rhs /= coef1;
     for (auto& rhsL : rhsLin) {
-      rhsL.second /= static_cast<float>(coef1);
+      rhsL.second /= coef1;
     }
 
     auto it = _mNViews.find(rhsLin);
@@ -1753,6 +1753,7 @@ private:
         //           if ( 0.0==lb && 0.0==ub ) {
         auto* newDom =
             new BinOp(Location().introduce(), FloatLit::a(lb), BOT_DOTDOT, FloatLit::a(ub));
+        newDom->type(Type::parsetfloat());
         vd->ti()->domain(newDom);
         DBGOUT_MIPD("  NULL OUT:  " << vd->id()->str());
         //           }
@@ -1760,6 +1761,7 @@ private:
         auto* newDom = new SetLit(
             Location().introduce(),
             IntSetVal::a(static_cast<long long int>(lb), static_cast<long long int>(ub)));
+        newDom->type(Type::parsetint());
         //           TypeInst* nti = copy(mipd.getEnv()->envi(),varFlag->ti())->cast<TypeInst>();
         //           nti->domain(newDom);
         vd->ti()->domain(newDom);
@@ -1774,6 +1776,7 @@ private:
       auto* newDom =
           new SetLit(Location().introduce(),
                      IntSetVal::a(static_cast<long long int>(LB), static_cast<long long int>(UB)));
+      newDom->type(Type::parsetint());
       auto* ti = new TypeInst(Location().introduce(), Type::varint(), newDom);
       auto* newVar = new VarDecl(Location().introduce(), ti, mipd.getEnv()->envi().genId());
       newVar->flat(newVar);
@@ -1790,7 +1793,7 @@ private:
         //             throw std::string("addLinConstr: &var=NULL");
         MZN_MIPD_assert_hard_msg(
             Expression::isa<Id>(v) || Expression::isa<IntLit>(v) || Expression::isa<FloatLit>(v),
-            "  expression at " << (&v) << " eid = " << Expression::eid(v)
+            "  expression at " << v << " eid = " << Expression::eid(v)
                                << " while E_INTLIT=" << Expression::E_INTLIT);
         //             throw std::string("addLinConstr: only id's as variables allowed");
       }
@@ -1798,10 +1801,8 @@ private:
       MZN_MIPD_assert_hard(CMPT_EQ == nCmpType || CMPT_LE == nCmpType);
       DBGOUT_MIPD_SELF(  // LinEq leq; leq.coefs=coefs; leq.vd=vars; leq.rhs=rhs;
           DBGOUT_MIPD_FLUSH(" ADDING " << (CMPT_EQ == nCmpType ? "LIN_EQ" : "LIN_LE") << ": [ ");
-          for (auto c
-               : coefs) DBGOUT_MIPD_FLUSH(c << ',');
-          DBGOUT_MIPD_FLUSH(" ] * [ "); for (auto v
-                                             : vars) {
+          for (auto c : coefs) DBGOUT_MIPD_FLUSH(c << ','); DBGOUT_MIPD_FLUSH(" ] * [ ");
+          for (auto v : vars) {
             MZN_MIPD_assert_hard(!v->isa<VarDecl>());
             if (v->isa<Id>()) DBGOUT_MIPD_FLUSH(v->dynamicCast<Id>()->str() << ',');
             //             else if ( v->isa<VarDecl>() )
@@ -2097,8 +2098,7 @@ private:
        << MIPD_stats[N_POSTs_NSubintvMax] << " NSubIntv m/a/m, " << MIPD_stats[N_POSTs_SubSizeMin]
        << " / " << dSubSizeAve << " / " << MIPD_stats[N_POSTs_SubSizeMax] << " SubIntvSize m/a/m, "
        << MIPD_stats[N_POSTs_cliquesWithEqEncode] << "+" << MIPD_stats[N_POSTs_clEEEnforced] << "("
-       << MIPD_stats[N_POSTs_clEEFound] << ")"
-       << " clq eq_encoded ";
+       << MIPD_stats[N_POSTs_clEEFound] << ")" << " clq eq_encoded ";
     //       << std::flush
     if (TCliqueSorter::LinEqGraph::dCoefMax > 1.0) {
       os << TCliqueSorter::LinEqGraph::dCoefMin << "--" << TCliqueSorter::LinEqGraph::dCoefMax

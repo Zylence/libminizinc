@@ -27,14 +27,14 @@
 
 namespace MiniZinc {
 
-void VarOccurrences::addIndex(VarDeclI* i, int idx_i) { idx.insert(i->e()->id(), idx_i); }
-void VarOccurrences::addIndex(VarDecl* e, int idx_i) {
+void VarOccurrences::addIndex(VarDeclI* i, unsigned int idx_i) { idx.insert(i->e()->id(), idx_i); }
+void VarOccurrences::addIndex(VarDecl* e, unsigned int idx_i) {
   assert(find(e) == -1);
   idx.insert(e->id(), idx_i);
 }
 int VarOccurrences::find(VarDecl* vd) {
   auto it = idx.find(vd->id());
-  return it.first ? *it.second : -1;
+  return it.first ? static_cast<int>(*it.second) : -1;
 }
 void VarOccurrences::remove(VarDecl* vd) { idx.remove(vd->id()); }
 
@@ -74,7 +74,7 @@ void VarOccurrences::unify(EnvI& env, Model* m, Id* id0_0, Id* id1_0) {
 
   int v0idx = find(v0);
   assert(v0idx != -1);
-  (*env.flat())[v0idx]->remove();
+  (*env.flat())[v0idx] -> remove();
 
   auto vi0 = itemMap.find(v0->id());
   if (vi0.first) {
@@ -201,19 +201,19 @@ void unify(EnvI& env, std::vector<VarDecl*>& deletedVarDecls, Id* id0, Id* id1) 
     if (id0->decl()->e() != nullptr && !Expression::equal(id0->decl()->e(), id1->decl()->id())) {
       Expression* rhs = id0->decl()->e();
 
-      auto* vdi1 = (*env.flat())[env.varOccurrences.find(id1->decl())]->cast<VarDeclI>();
+      auto* vdi1 = (*env.flat())[env.varOccurrences.find(id1->decl())] -> cast<VarDeclI>();
       CollectOccurrencesE ce(env, env.varOccurrences, vdi1);
       top_down(ce, rhs);
 
       id1->decl()->e(rhs);
       id0->decl()->e(nullptr);
 
-      auto* vdi0 = (*env.flat())[env.varOccurrences.find(id0->decl())]->cast<VarDeclI>();
+      auto* vdi0 = (*env.flat())[env.varOccurrences.find(id0->decl())] -> cast<VarDeclI>();
       CollectDecls cd(env, env.varOccurrences, deletedVarDecls, vdi0);
       top_down(cd, rhs);
     }
     if (Expression::equal(id1->decl()->e(), id0->decl()->id())) {
-      auto* vdi1 = (*env.flat())[env.varOccurrences.find(id1->decl())]->cast<VarDeclI>();
+      auto* vdi1 = (*env.flat())[env.varOccurrences.find(id1->decl())] -> cast<VarDeclI>();
       CollectDecls cd(env, env.varOccurrences, deletedVarDecls, vdi1);
       Expression* rhs = id1->decl()->e();
       top_down(cd, rhs);
@@ -297,8 +297,9 @@ void unify(EnvI& env, std::vector<VarDecl*>& deletedVarDecls, Id* id0, Id* id1) 
       assert(env.outputFlatVarOccurrences.find(id1->decl()) != -1);
       VarDecl* id1_output =
           (*env.output)[env.outputFlatVarOccurrences.find(id1->decl())]->cast<VarDeclI>()->e();
-      if (id0_output->e() == nullptr) {
-        id0_output->e(id1_output->id());
+      auto* decl = Expression::cast<VarDecl>(follow_id_to_decl(id0_output));
+      if (decl->e() == nullptr) {
+        decl->e(id1_output->id());
       }
     }
 
@@ -311,7 +312,8 @@ void simplify_bool_constraint(EnvI& env, Item* ii, VarDecl* vd, bool& remove,
                               std::deque<unsigned int>& vardeclQueue,
                               std::deque<Item*>& constraintQueue, std::vector<Item*>& toRemove,
                               std::vector<VarDecl*>& deletedVarDecls,
-                              std::unordered_map<Expression*, int>& nonFixedLiteralCount);
+                              std::unordered_map<Expression*, int>& nonFixedLiteralCount,
+                              std::vector<std::pair<Id*, Item*>>& toUnsubscribe);
 
 bool simplify_constraint(EnvI& env, Item* ii, std::vector<VarDecl*>& deletedVarDecls,
                          std::deque<Item*>& constraintQueue,
@@ -324,7 +326,7 @@ void push_vardecl(EnvI& env, VarDeclI* vdi, unsigned int vd_idx, std::deque<unsi
   }
 }
 void push_vardecl(EnvI& env, unsigned int vd_idx, std::deque<unsigned int>& q) {
-  push_vardecl(env, (*env.flat())[vd_idx]->cast<VarDeclI>(), vd_idx, q);
+  push_vardecl(env, (*env.flat())[vd_idx] -> cast<VarDeclI>(), vd_idx, q);
 }
 
 void push_dependent_constraints(EnvI& env, Id* id, std::deque<Item*>& q) {
@@ -338,7 +340,7 @@ void push_dependent_constraints(EnvI& env, Id* id, std::deque<Item*>& q) {
         }
       } else if (auto* vdi = item->dynamicCast<VarDeclI>()) {
         if (vdi->e()->id()->decl() != vdi->e()) {
-          vdi = (*env.flat())[env.varOccurrences.find(vdi->e()->id()->decl())]->cast<VarDeclI>();
+          vdi = (*env.flat())[env.varOccurrences.find(vdi->e()->id()->decl())] -> cast<VarDeclI>();
         }
         if (!vdi->removed() && !vdi->flag() && (vdi->e()->e() != nullptr)) {
           vdi->flag(true);
@@ -424,8 +426,8 @@ void optimize(Env& env, bool chain_compression) {
   try {
     EnvI& envi = env.envi();
     Model& m = *envi.flat();
-    std::vector<int> toAssignBoolVars;
-    std::vector<int> toRemoveConstraints;
+    std::vector<unsigned int> toAssignBoolVars;
+    std::vector<unsigned int> toRemoveConstraints;
     std::vector<VarDecl*> deletedVarDecls;
 
     // Queue of constraint and variable items that still need to be optimised
@@ -433,7 +435,7 @@ void optimize(Env& env, bool chain_compression) {
     // Queue of variable declarations (indexes into the model) that still need to be optimised
     std::deque<unsigned int> vardeclQueue;
 
-    std::vector<int> boolConstraints;
+    std::vector<unsigned int> boolConstraints;
 
     GCLock lock;
 
@@ -460,7 +462,7 @@ void optimize(Env& env, bool chain_compression) {
     //  - unify variables that are assigned to an identifier
     //  - push bool vars that are fixed and have a RHS (to propagate the RHS constraint)
     //  - push int/float vars that are fixed (either have a RHS or a singleton domain)
-    for (int i = 0; i < m.size(); i++) {
+    for (unsigned int i = 0; i < m.size(); i++) {
       env.envi().checkCancel();
       if (m[i]->removed()) {
         continue;
@@ -880,6 +882,7 @@ void optimize(Env& env, bool chain_compression) {
 
           // Handle all boolean constraints that involve this variable
           if (it.first) {
+            std::vector<std::pair<Id*, Item*>> toUnsubscribe;
             for (auto* item : *it.second) {
               if (item->removed()) {
                 continue;
@@ -894,7 +897,14 @@ void optimize(Env& env, bool chain_compression) {
               }
               // Simplify the constraint *item (which depends on this variable)
               simplify_bool_constraint(envi, item, vd, remove, vardeclQueue, constraintQueue,
-                                       toRemove, deletedVarDecls, nonFixedLiteralCount);
+                                       toRemove, deletedVarDecls, nonFixedLiteralCount,
+                                       toUnsubscribe);
+            }
+            for (auto& unsubscribe : toUnsubscribe) {
+              auto it = envi.varOccurrences.itemMap.find(unsubscribe.first);
+              if (it.first) {
+                it.second->erase(unsubscribe.second);
+              }
             }
           }
           // Actually remove all items that have become unnecessary in the step above
@@ -1743,7 +1753,8 @@ int bool_state(EnvI& env, Expression* e) {
   return static_cast<int>(id->decl()->ti()->domain() == env.constants.literalTrue);
 }
 
-int decrement_non_fixed_vars(std::unordered_map<Expression*, int>& nonFixedLiteralCount, Call* c) {
+int decrement_non_fixed_vars(EnvI& env, Item* ii, std::vector<std::pair<Id*, Item*>>& toUnsubscribe,
+                             std::unordered_map<Expression*, int>& nonFixedLiteralCount, Call* c) {
   auto it = nonFixedLiteralCount.find(c);
   if (it == nonFixedLiteralCount.end()) {
     int nonFixedVars = 0;
@@ -1755,6 +1766,9 @@ int decrement_non_fixed_vars(std::unordered_map<Expression*, int>& nonFixedLiter
             (Expression::isa<Id>((*al)[j]) &&
              Expression::cast<Id>((*al)[j])->decl()->ti()->domain() != nullptr)) {
           nonFixedVars--;
+          if (Expression::isa<Id>((*al)[j])) {
+            toUnsubscribe.emplace_back(Expression::cast<Id>((*al)[j]), ii);
+          }
         }
       }
     }
@@ -1769,7 +1783,8 @@ void simplify_bool_constraint(EnvI& env, Item* ii, VarDecl* vd, bool& remove,
                               std::deque<unsigned int>& vardeclQueue,
                               std::deque<Item*>& constraintQueue, std::vector<Item*>& toRemove,
                               std::vector<VarDecl*>& deletedVarDecls,
-                              std::unordered_map<Expression*, int>& nonFixedLiteralCount) {
+                              std::unordered_map<Expression*, int>& nonFixedLiteralCount,
+                              std::vector<std::pair<Id*, Item*>>& toUnsubscribe) {
   if (ii->isa<SolveI>()) {
     remove = false;
     return;
@@ -1929,7 +1944,7 @@ void simplify_bool_constraint(EnvI& env, Item* ii, VarDecl* vd, bool& remove,
         }
       }
     } else {
-      int nonfixed = decrement_non_fixed_vars(nonFixedLiteralCount, c);
+      int nonfixed = decrement_non_fixed_vars(env, ii, toUnsubscribe, nonFixedLiteralCount, c);
       bool isConjunction = (c->id() == env.constants.ids.forall);
       assert(nonfixed >= 0);
       if (nonfixed <= 1) {

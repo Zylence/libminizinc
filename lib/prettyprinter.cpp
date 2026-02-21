@@ -20,6 +20,7 @@
 #include <minizinc/model.hh>
 #include <minizinc/prettyprinter.hh>
 #include <minizinc/type.hh>
+#include <minizinc/typecheck.hh>
 
 #include <iomanip>
 #include <limits>
@@ -129,6 +130,30 @@ void pp_floatval(std::ostream& os, const FloatVal& fv, bool hexFloat) {
   os << fv;
 }
 
+bool pp_type_is_any(const VarDecl* vd) {
+  if (vd->type().structBT()) {
+    // Check if the type needs to be printed as "any"
+    std::vector<TypeInst*> ti_stack({vd->ti()});
+    while (!ti_stack.empty()) {
+      auto* ti = ti_stack.back();
+      ti_stack.pop_back();
+      if (ti->type().istop() && ti->domain() == nullptr) {
+        return true;
+      }
+      if (const auto* al = Expression::dynamicCast<ArrayLit>(ti->domain())) {
+        for (unsigned int i = 0; i < al->size(); ++i) {
+          if (auto* vd = Expression::dynamicCast<VarDecl>((*al)[i])) {
+            ti_stack.push_back(vd->ti());
+          } else {
+            ti_stack.push_back(Expression::cast<TypeInst>((*al)[i]));
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
 template <bool trace>
 class PlainPrinter {
 private:
@@ -146,12 +171,12 @@ public:
       p(e);
       return;
     }
-    switch (type.ti()) {
-      case Type::TI_PAR:
-        break;
-      case Type::TI_VAR:
-        _os << "var ";
-        break;
+    if (type.istop() && e == nullptr) {
+      _os << "any";
+      return;
+    }
+    if (type.isvar() && !type.structBT()) {
+      _os << "var ";
     }
     if (type.ot() == Type::OT_OPTIONAL) {
       _os << "opt ";
@@ -180,7 +205,7 @@ public:
           _os << "tuple(";
           if (_env != nullptr && type.typeId() != 0) {
             TupleType* tt = _env->getTupleType(type);
-            for (int i = 0; i < tt->size(); ++i) {
+            for (unsigned int i = 0; i < tt->size(); ++i) {
               p((*tt)[i], nullptr);
               if (i < tt->size() - 1) {
                 _os << ", ";
@@ -196,7 +221,7 @@ public:
           _os << "record(";
           if (_env != nullptr && type.typeId() != 0) {
             RecordType* rt = _env->getRecordType(type);
-            for (int i = 0; i < rt->size(); ++i) {
+            for (unsigned int i = 0; i < rt->size(); ++i) {
               p((*rt)[i], nullptr);
               _os << ": " << Printer::quoteId(rt->fieldName(i));
               if (i < rt->size() - 1) {
@@ -222,9 +247,17 @@ public:
       // TODO: Why does `type` sometimes not have a type ID even though `al` does?
       auto t = al->type().structBT() ? al->type() : type;
       assert(t.structBT());
+      if (_env != nullptr && t.bt() == Type::BT_TUPLE && t.typeId() != 0) {
+        auto* tt = _env->getTupleType(t);
+        if (tt->size() == 2 && (*tt)[1].isunknown()) {
+          // This is an array of arrays - print first component only
+          p((*tt)[0], (*al)[0]);
+          return;
+        }
+      }
       _os << (t.bt() == Type::BT_TUPLE ? "tuple(" : "record(");
       if (t.bt() != Type::BT_RECORD || t.typeId() != 0) {
-        for (size_t i = 0; i < al->size(); ++i) {
+        for (unsigned int i = 0; i < al->size(); ++i) {
           auto* ti = Expression::cast<TypeInst>((*al)[i]);
           p(ti);
           if (t.bt() == Type::BT_RECORD) {
@@ -237,7 +270,7 @@ public:
           }
         }
       } else {
-        for (size_t i = 0; i < al->size(); ++i) {
+        for (unsigned int i = 0; i < al->size(); ++i) {
           auto* vd = Expression::cast<VarDecl>((*al)[i]);
           p(vd->ti());
           _os << ": ";
@@ -371,6 +404,14 @@ public:
         break;
       case Expression::E_ARRAYLIT: {
         const auto* al = Expression::cast<ArrayLit>(e);
+        if (_env != nullptr && al->type().bt() == Type::BT_TUPLE && al->type().typeId() != 0) {
+          auto* tt = _env->getTupleType(Expression::type(al));
+          if (tt->size() == 2 && (*tt)[1].isunknown()) {
+            // This is an array of arrays, print the first element
+            p((*al)[0]);
+            break;
+          }
+        }
         unsigned int n = al->dims();
         if (n == 1 && al->min(0) == 1) {
           _os << (al->isTuple() ? "(" : "[");
@@ -417,7 +458,7 @@ public:
         } else {
           assert(!al->isTuple());
           _os << "array" << n << "d(";
-          for (int i = 0; i < al->dims(); i++) {
+          for (unsigned int i = 0; i < al->dims(); i++) {
             _os << al->min(i) << ".." << al->max(i);
             _os << ",";
           }
@@ -433,7 +474,16 @@ public:
       } break;
       case Expression::E_ARRAYACCESS: {
         const auto* aa = Expression::cast<ArrayAccess>(e);
+        bool needParentheses =
+            !(Expression::isa<Id>(aa->v()) || Expression::isa<Call>(aa->v()) ||
+              Expression::isa<ArrayLit>(aa->v()) || Expression::isa<Comprehension>(aa->v()));
+        if (needParentheses) {
+          _os << "(";
+        }
         p(aa->v());
+        if (needParentheses) {
+          _os << ")";
+        }
         _os << "[";
         for (unsigned int i = 0; i < aa->idx().size(); i++) {
           p(aa->idx()[i]);
@@ -478,7 +528,8 @@ public:
           // Has been turned into field number, so need to convert back into name
           auto* rt = _env->getRecordType(Expression::type(fa->v()));
           auto* i = Expression::cast<IntLit>(fa->field());
-          _os << Printer::quoteId(rt->fieldName(IntLit::v(i).toInt() - 1));
+          _os << Printer::quoteId(
+              rt->fieldName(static_cast<unsigned int>(IntLit::v(i).toInt()) - 1));
         } else {
           p(fa->field());
         }
@@ -511,8 +562,8 @@ public:
         }
 
         _os << " | ";
-        for (int i = 0; i < c->numberOfGenerators(); i++) {
-          for (int j = 0; j < c->numberOfDecls(i); j++) {
+        for (unsigned int i = 0; i < c->numberOfGenerators(); i++) {
+          for (unsigned int j = 0; j < c->numberOfDecls(i); j++) {
             auto* ident = c->decl(i, j)->id();
             if (ident->idn() == -1) {
               _os << ident->v();
@@ -555,7 +606,7 @@ public:
       } break;
       case Expression::E_ITE: {
         const auto* ite = Expression::cast<ITE>(e);
-        for (int i = 0; i < ite->size(); i++) {
+        for (unsigned int i = 0; i < ite->size(); i++) {
           _os << (i == 0 ? "if " : " elseif ");
           p(ite->ifExpr(i));
           _os << " then ";
@@ -703,23 +754,31 @@ public:
       } break;
       case Expression::E_CALL: {
         const auto* c = Expression::cast<Call>(e);
-        _os << Printer::quoteId(c->id()) << "(";
-        for (unsigned int i = 0; i < c->argCount(); i++) {
-          p(c->arg(i));
-          if (i < c->argCount() - 1) {
-            _os << ",";
+        if (c->id() == "default" && c->argCount() == 2) {
+          _os << "((";
+          p(c->arg(0));
+          _os << ") default (";
+          p(c->arg(1));
+          _os << "))";
+        } else {
+          _os << Printer::quoteId(c->id()) << "(";
+          for (unsigned int i = 0; i < c->argCount(); i++) {
+            p(c->arg(i));
+            if (i < c->argCount() - 1) {
+              _os << ",";
+            }
           }
-        }
-        _os << ")";
-        if (trace && Expression::type(e).isPar()) {
-          Expression* result = nullptr;
-          try {
-            result = eval_par(*_env, const_cast<Expression*>(e));
-            _os << "(≡";
-            p(result);
-            _os << ")";
-          } catch (ResultUndefinedError) {
-            _os << "(≡⊥)";
+          _os << ")";
+          if (trace && Expression::type(e).isPar()) {
+            Expression* result = nullptr;
+            try {
+              result = eval_par(*_env, const_cast<Expression*>(e));
+              _os << "(≡";
+              p(result);
+              _os << ")";
+            } catch (ResultUndefinedError) {
+              _os << "(≡⊥)";
+            }
           }
         }
       } break;
@@ -728,7 +787,11 @@ public:
         if (vd->isTypeAlias()) {
           _os << "type";
         } else {
-          p(vd->ti());
+          if (pp_type_is_any(vd)) {
+            _os << "any";
+          } else {
+            p(vd->ti());
+          }
           if (!vd->ti()->isEnum() && (vd->id()->idn() != -1 || !vd->id()->v().empty())) {
             _os << ":";
           }
@@ -771,17 +834,21 @@ public:
         if (ti->isEnum()) {
           _os << "enum";
         } else {
-          if (ti->isarray()) {
-            _os << "array [";
-            for (unsigned int i = 0; i < ti->ranges().size(); i++) {
-              p(Type::parint(), ti->ranges()[i]);
-              if (i < ti->ranges().size() - 1) {
-                _os << ",";
+          if (ti->type().istop() && ti->domain() == nullptr) {
+            _os << "any";
+          } else {
+            if (ti->isarray()) {
+              _os << "array [";
+              for (unsigned int i = 0; i < ti->ranges().size(); i++) {
+                p(Type::parint(), ti->ranges()[i]);
+                if (i < ti->ranges().size() - 1) {
+                  _os << ",";
+                }
               }
+              _os << "] of ";
             }
-            _os << "] of ";
+            p(ti->type(), ti->domain());
           }
-          p(ti->type(), ti->domain());
         }
       }
     }
@@ -846,10 +913,23 @@ public:
       case Item::II_FUN: {
         const FunctionI& fi = *i->cast<FunctionI>();
         if (fi.ti()->type().isAnn() && fi.e() == nullptr) {
-          _os << "annotation ";
-        } else if (fi.ti()->type() == Type::parbool()) {
+          bool internalRepr = false;
+          for (auto* a : fi.ann()) {
+            if (auto* ident = Expression::dynamicCast<Id>(a)) {
+              if (ident->idn() == -1 && ident->v() == "mzn_internal_representation") {
+                internalRepr = true;
+                break;
+              }
+            }
+          }
+          if (internalRepr) {
+            _os << "function ann: ";
+          } else {
+            _os << "annotation ";
+          }
+        } else if (fi.ti()->type() == Type::parbool() && fi.id().c_str()[0] != '\'') {
           _os << "test ";
-        } else if (fi.ti()->type() == Type::varbool()) {
+        } else if (fi.ti()->type() == Type::varbool() && fi.id().c_str()[0] != '\'') {
           _os << "predicate ";
         } else {
           _os << "function ";
@@ -1202,12 +1282,8 @@ Document* tiexpression_to_document(const Type& type, const Expression* e, EnvI* 
   if (type.any()) {
     dl->addStringToList("any ");
   } else {
-    switch (type.ti()) {
-      case Type::TI_PAR:
-        break;
-      case Type::TI_VAR:
-        dl->addStringToList("var ");
-        break;
+    if (type.isvar() && !type.structBT()) {
+      dl->addStringToList("var ");
     }
     if (type.ot() == Type::OT_OPTIONAL) {
       dl->addStringToList("opt ");
@@ -1253,7 +1329,7 @@ Document* tiexpression_to_document(const Type& type, const Expression* e, EnvI* 
     assert(type.structBT());
     dl->addStringToList(type.bt() == Type::BT_TUPLE ? "tuple(" : "record(");
     if (type.bt() != Type::BT_RECORD || type.typeId() != 0) {
-      for (size_t i = 0; i < al->size(); ++i) {
+      for (unsigned int i = 0; i < al->size(); ++i) {
         auto* ti = Expression::cast<TypeInst>((*al)[i]);
         dl->addDocumentToList(expression_to_document(ti, env));
         if (type.bt() == Type::BT_RECORD) {
@@ -1269,7 +1345,7 @@ Document* tiexpression_to_document(const Type& type, const Expression* e, EnvI* 
         }
       }
     } else {
-      for (size_t i = 0; i < al->size(); ++i) {
+      for (unsigned int i = 0; i < al->size(); ++i) {
         auto* vd = Expression::cast<VarDecl>((*al)[i]);
         dl->addDocumentToList(expression_to_document(vd->ti(), env));
         dl->addStringToList(": ");
@@ -1407,6 +1483,13 @@ public:
   static ret mapAnonVar(const AnonVar* /*v*/) { return new StringDocument("_"); }
   ret mapArrayLit(const ArrayLit* al) {
     /// TODO: test multi-dimensional arrays handling
+    if (_env != nullptr && al->type().bt() == Type::BT_TUPLE && al->type().typeId() != 0) {
+      auto* tt = _env->getTupleType(Expression::type(al));
+      if (tt->size() == 2 && (*tt)[1].isunknown()) {
+        // This is an array of arrays, print the first element
+        return expression_to_document((*al)[0], _env);
+      }
+    }
     DocumentList* dl;
     unsigned int n = al->dims();
     if (n == 1 && al->min(0) == 1) {
@@ -1444,7 +1527,7 @@ public:
       dl->addStringToList(oss.str());
       auto* args = new DocumentList("(", ", ", ")");
 
-      for (int i = 0; i < al->dims(); i++) {
+      for (unsigned int i = 0; i < al->dims(); i++) {
         oss.str("");
         oss << al->min(i) << ".." << al->max(i);
         args->addStringToList(oss.str());
@@ -1487,10 +1570,10 @@ public:
     dl->addDocumentToList(expression_to_document(c->e(), _env));
     auto* head = new DocumentList("", " ", "");
     auto* generators = new DocumentList("", ", ", "");
-    for (int i = 0; i < c->numberOfGenerators(); i++) {
+    for (unsigned int i = 0; i < c->numberOfGenerators(); i++) {
       auto* gen = new DocumentList("", "", "");
       auto* idents = new DocumentList("", ", ", "");
-      for (int j = 0; j < c->numberOfDecls(i); j++) {
+      for (unsigned int j = 0; j < c->numberOfDecls(i); j++) {
         std::ostringstream ss;
         Id* ident = c->decl(i, j)->id();
         if (ident->idn() == -1) {
@@ -1523,7 +1606,7 @@ public:
   }
   ret mapITE(const ITE* ite) {
     auto* dl = new DocumentList("", "", "");
-    for (int i = 0; i < ite->size(); i++) {
+    for (unsigned int i = 0; i < ite->size(); i++) {
       std::string beg = (i == 0 ? "if " : " elseif ");
       dl->addStringToList(beg);
       dl->addDocumentToList(expression_to_document(ite->ifExpr(i), _env));
@@ -1718,10 +1801,10 @@ public:
           auto* args = new DocumentList("", " ", "", false);
           auto* generators = new DocumentList("", ", ", "");
 
-          for (int i = 0; i < com->numberOfGenerators(); i++) {
+          for (unsigned int i = 0; i < com->numberOfGenerators(); i++) {
             auto* gen = new DocumentList("", "", "");
             auto* idents = new DocumentList("", ", ", "");
-            for (int j = 0; j < com->numberOfDecls(i); j++) {
+            for (unsigned int j = 0; j < com->numberOfDecls(i); j++) {
               if (com->decl(i, j)->id()->idn() < -1) {
                 idents->addStringToList("_");
               } else {
@@ -1781,7 +1864,11 @@ public:
         oss << "X_INTRODUCED_" << vd->id()->idn() << "_";
       }
     } else {
-      dl->addDocumentToList(expression_to_document(vd->ti(), _env));
+      if (pp_type_is_any(vd)) {
+        dl->addStringToList("any");
+      } else {
+        dl->addDocumentToList(expression_to_document(vd->ti(), _env));
+      }
       if (vd->id()->idn() == -1) {
         if (!vd->id()->v().empty()) {
           oss << ": " << vd->id()->v().c_str();
@@ -1844,16 +1931,20 @@ public:
   }
   ret mapTypeInst(const TypeInst* ti) {
     auto* dl = new DocumentList("", "", "");
-    if (ti->isarray()) {
-      dl->addStringToList("array [");
-      auto* ran = new DocumentList("", ", ", "");
-      for (unsigned int i = 0; i < ti->ranges().size(); i++) {
-        ran->addDocumentToList(tiexpression_to_document(Type::parint(), ti->ranges()[i], _env));
+    if (ti->type().istop() && ti->domain() == nullptr) {
+      dl->addStringToList("any");
+    } else {
+      if (ti->isarray()) {
+        dl->addStringToList("array [");
+        auto* ran = new DocumentList("", ", ", "");
+        for (unsigned int i = 0; i < ti->ranges().size(); i++) {
+          ran->addDocumentToList(tiexpression_to_document(Type::parint(), ti->ranges()[i], _env));
+        }
+        dl->addDocumentToList(ran);
+        dl->addStringToList("] of ");
       }
-      dl->addDocumentToList(ran);
-      dl->addStringToList("] of ");
+      dl->addDocumentToList(tiexpression_to_document(ti->type(), ti->domain(), _env));
     }
-    dl->addDocumentToList(tiexpression_to_document(ti->type(), ti->domain(), _env));
     return dl;
   }
 };
@@ -2535,6 +2626,96 @@ void FznJSONPrinter::print(MiniZinc::Model* m) {
   _os << " },\n"
       << "  \"version\": \"1.0\"\n"
       << "}\n";
+}
+
+std::string show_enum_type(EnvI& env, Expression* e, Type t, bool dzn, bool json) {
+  Id* ti_id = env.getEnum(t.typeId())->e()->id();
+  GCLock lock;
+  std::vector<Expression*> args(3);
+  args[0] = e;
+  if (Expression::type(e).dim() > 1) {
+    Call* array1d = Call::a(Location().introduce(), env.constants.ids.array1d, {e});
+    Type array1dt = Type::arrType(env, Type::partop(1), t);
+    array1d->type(array1dt);
+    array1d->decl(env.model->matchFn(env, array1d, false, true));
+    args[0] = array1d;
+  }
+  args[1] = env.constants.boollit(dzn);
+  args[2] = env.constants.boollit(json);
+  ASTString enumName(create_enum_to_string_name(ti_id, "_toString_"));
+  auto* call = Call::a(Location().introduce(), enumName, args);
+  auto* fi = env.model->matchFn(env, call, false, true);
+  call->decl(fi);
+  Expression::type(call, Type::parstring());
+  return eval_string(env, call);
+}
+
+std::string show_with_type(EnvI& env, Expression* exp, Type t, bool showDzn) {
+  GCLock lock;
+  Expression* e = follow_id_to_decl(exp);
+  if (auto* vd = Expression::dynamicCast<VarDecl>(e)) {
+    if ((vd->e() != nullptr) && !Expression::isa<Call>(vd->e())) {
+      e = vd->e();
+    } else {
+      e = vd->id();
+    }
+  }
+  if (Expression::type(e).isPar()) {
+    e = eval_par(env, e);
+  }
+  if (Expression::type(e).dim() > 0 || Expression::type(e).structBT()) {
+    e = eval_array_lit(env, e);
+  }
+  if (Expression::type(e).isPar() && Expression::type(e).dim() == 0 && t.bt() == Type::BT_INT &&
+      t.typeId() != 0) {
+    return show_enum_type(env, e, t, showDzn, false);
+  }
+  std::ostringstream oss;
+  if (auto* al = Expression::dynamicCast<ArrayLit>(e)) {
+    auto al_t = t;
+    if (al->isTuple() && env.getTransparentType(t) != t) {
+      // Unwrap nested array type
+      al = eval_array_lit(env, (*al)[0]);
+      al_t = env.getTransparentType(t);
+    }
+    oss << (al->isTuple() ? "(" : "[");
+    if (al->type().isrecord()) {
+      RecordType* rt = env.getRecordType(al->type());
+      assert(al->size() == rt->size());
+      for (unsigned int i = 0; i < al->size(); i++) {
+        oss << Printer::quoteId(rt->fieldName(i)) << ": "
+            << show_with_type(env, (*al)[i], (*rt)[i], showDzn);
+        if (i < al->size() - 1) {
+          oss << ", ";
+        }
+      }
+    } else if (al->type().istuple()) {
+      TupleType* tt = env.getTupleType(al->type());
+      for (unsigned int i = 0; i < al->size(); i++) {
+        oss << show_with_type(env, (*al)[i], (*tt)[i], showDzn);
+        if (i < al->size() - 1) {
+          oss << ", ";
+        }
+      }
+      if (al->size() == 1) {
+        oss << ",";
+      }
+    } else {
+      // Use element type from al_t since evaluating e may have removed the enum types
+      auto elemType = al_t.elemType(env);
+      for (unsigned int i = 0; i < al->size(); i++) {
+        oss << show_with_type(env, (*al)[i], elemType, showDzn);
+        if (i < al->size() - 1) {
+          oss << ", ";
+        }
+      }
+    }
+    oss << (al->isTuple() ? ")" : "]");
+  } else {
+    Printer p(oss, 0, false, &env);
+    p.print(e);
+  }
+  return oss.str();
 }
 
 }  // namespace MiniZinc
